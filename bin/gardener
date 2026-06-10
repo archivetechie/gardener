@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# gardener — background repo hygiene for humans who'd rather be building.
+# Subcommands: add, remove, list, init, install, run, daily, log, status
+set -euo pipefail
+
+GARDENER_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_DIR="${GARDENER_CONFIG_DIR:-$HOME/.config/gardener}"
+STATE_DIR="${GARDENER_STATE_DIR:-$HOME/.local/state/gardener}"
+REPOS_FILE="$CONFIG_DIR/repos"
+mkdir -p "$CONFIG_DIR" "$STATE_DIR"
+touch "$REPOS_FILE"
+
+usage() {
+    cat <<EOF
+gardener — background repo hygiene (auto-checkpoint, push, prune) + daily AI tidy-up
+
+usage:
+  gardener add <path>        manage a repo (adds to $REPOS_FILE)
+  gardener remove <path>     stop managing a repo
+  gardener list              show managed repos
+  gardener init <path>       seed a repo with the workflow convention files
+                             (CLAUDE.md, AGENTS.md, docs/INDEX.md) and manage it
+  gardener install [--daily] install cron: housekeep every 2h (+ daily AI layer at 02:30)
+  gardener run               run housekeep now
+  gardener daily             run the daily AI layer now
+  gardener log               tail the housekeep log
+  gardener status            cron + config + per-repo dirty/ahead summary
+EOF
+}
+
+abspath() { cd "$1" 2>/dev/null && pwd; }
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+    add)
+        p=$(abspath "${1:?path required}") || { echo "no such dir: $1" >&2; exit 1; }
+        [[ -d "$p/.git" ]] || { echo "not a git repo: $p" >&2; exit 1; }
+        grep -qxF "$p" "$REPOS_FILE" || echo "$p" >>"$REPOS_FILE"
+        echo "✓ managing $p"
+        ;;
+    remove)
+        p=$(abspath "${1:?path required}") || p="$1"
+        grep -vxF "$p" "$REPOS_FILE" >"$REPOS_FILE.tmp" && mv "$REPOS_FILE.tmp" "$REPOS_FILE"
+        echo "✓ no longer managing $p"
+        ;;
+    list)
+        cat "$REPOS_FILE"
+        ;;
+    init)
+        p=$(abspath "${1:?path required}") || { echo "no such dir: $1" >&2; exit 1; }
+        [[ -d "$p/.git" ]] || { echo "not a git repo: $p" >&2; exit 1; }
+        name=$(basename "$p")
+        for t in CLAUDE.md AGENTS.md; do
+            if [[ -e "$p/$t" ]]; then
+                echo "  $t exists — leaving it alone (see $GARDENER_HOME/templates/$t to merge by hand)"
+            else
+                sed "s|{{REPO_NAME}}|$name|g" "$GARDENER_HOME/templates/$t" >"$p/$t"
+                echo "✓ seeded $t"
+            fi
+        done
+        mkdir -p "$p/docs/archive"
+        if [[ ! -e "$p/docs/INDEX.md" ]]; then
+            sed "s|{{REPO_NAME}}|$name|g" "$GARDENER_HOME/templates/docs-INDEX.md" >"$p/docs/INDEX.md"
+            echo "✓ seeded docs/INDEX.md (+ docs/archive/)"
+        fi
+        "$0" add "$p"
+        echo "→ review the seeded files, fill the {{...}} blanks, then commit."
+        ;;
+    install)
+        H_ENTRY="17 */2 * * * $GARDENER_HOME/bin/housekeep.sh >/dev/null 2>&1"
+        ( crontab -l 2>/dev/null | grep -vE 'gardener/bin/(housekeep|daily)\.sh|ops/(housekeep|daily-housekeeper)\.sh'; echo "$H_ENTRY" ) | crontab -
+        echo "✓ cron: housekeep every 2h"
+        if [[ "${1:-}" == "--daily" ]]; then
+            D_ENTRY="30 2 * * * $GARDENER_HOME/bin/daily.sh >/dev/null 2>&1"
+            ( crontab -l 2>/dev/null; echo "$D_ENTRY" ) | crontab -
+            echo "✓ cron: daily AI layer at 02:30 (requires the claude CLI)"
+        fi
+        ;;
+    run)     exec "$GARDENER_HOME/bin/housekeep.sh" ;;
+    daily)   exec "$GARDENER_HOME/bin/daily.sh" ;;
+    log)     exec tail -n "${1:-40}" "$STATE_DIR/housekeep.log" ;;
+    status)
+        echo "config: $REPOS_FILE"; echo "cron:"; crontab -l 2>/dev/null | grep -E "gardener" | sed 's/^/  /' || echo "  (not installed)"
+        echo "repos:"
+        grep -vE '^\s*(#|$)' "$REPOS_FILE" | while IFS= read -r r; do
+            r="${r/#\~/$HOME}"
+            [[ -d "$r/.git" ]] || { echo "  $r  MISSING"; continue; }
+            d=$(git -C "$r" status --porcelain | wc -l)
+            a=$(git -C "$r" rev-list --count '@{u}..HEAD' 2>/dev/null || echo '?')
+            printf "  %-40s dirty:%-4s ahead:%s\n" "$r" "$d" "$a"
+        done
+        ;;
+    ""|help|-h|--help) usage ;;
+    *) echo "unknown command: $cmd" >&2; usage >&2; exit 1 ;;
+esac
