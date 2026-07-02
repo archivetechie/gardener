@@ -13,6 +13,8 @@ STATE_DIR="${GARDENER_STATE_DIR:-$HOME/.local/state/gardener}"
 LOG="$STATE_DIR/daily.log"
 mkdir -p "$STATE_DIR"
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+# Cron has no SSH agent; pushes to SSH remotes need the keychain-held key.
+[[ -f "$HOME/.keychain/akash-sh" ]] && . "$HOME/.keychain/akash-sh"
 
 DAILY_MODEL="claude-sonnet-4-6"
 DAILY_MAX_TURNS=40

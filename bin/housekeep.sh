@@ -18,6 +18,9 @@
 
 set -uo pipefail
 
+# Cron has no SSH agent; pushes to SSH remotes need the keychain-held key.
+[[ -f "$HOME/.keychain/akash-sh" ]] && . "$HOME/.keychain/akash-sh"
+
 CONFIG_DIR="${GARDENER_CONFIG_DIR:-$HOME/.config/gardener}"
 STATE_DIR="${GARDENER_STATE_DIR:-$HOME/.local/state/gardener}"
 REPOS_FILE="$CONFIG_DIR/repos"

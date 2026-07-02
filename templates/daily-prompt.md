@@ -15,8 +15,17 @@ Do, in order:
 4. If a repo tracks work status in a board/registry file (e.g. GAPBOARD.md,
    docs/scenario-registry.md), reconcile drift between them and call out
    regressions (previously-passing things now failing) prominently.
-5. If a repo has a `journal/` directory, append a terse "## gardener (auto)" section
+5. If a repo has a `STANDING.md` standing-issues ledger, maintain it: update
+   last-seen dates for issues observed today; add a row for any issue that has now
+   appeared on 2+ days (push failures, red scenarios, tracking bugs); apply its
+   escalation rule — an issue `open` on 3+ distinct days must either get a codex
+   fix prompt cut into `docs/` (a normal implementation prompt; state → fix-queued;
+   list it in docs/INDEX.md) or be flagged for the owner to mark `accepted`. Drop
+   `fixed` rows after two consecutive clean days. In the journal, do NOT re-describe
+   standing issues — reference the ledger in one line ("STANDING: N open, M
+   escalated").
+6. If a repo has a `journal/` directory, append a terse "## gardener (auto)" section
    to today's `journal/YYYY-MM-DD.md` summarizing what you did (or one line:
    "nothing to do").
-6. Commit any changes you made with message prefix "auto(daily): " and push.
+7. Commit any changes you made with message prefix "auto(daily): " and push.
    Leave every working tree as clean as you found it or cleaner.
