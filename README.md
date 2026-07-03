@@ -11,6 +11,21 @@ Born from a real workflow: one human + Claude (design/review) + Codex
 between threads. The hygiene debt that pattern generates is exactly what gardener
 automates.
 
+## Beyond hygiene: the full working method
+
+Gardener grew into the home of the whole way of working — see
+**[WORKING-METHOD.md](WORKING-METHOD.md)** (the loop: design → panel review →
+contract-referenced prompts → implementation → diff gate → scenario verify; plus
+thread-keyed cockpit sessions, the cross-session context bus, and model-economy
+routing). New tools in `bin/`:
+
+- **`sitrep`** — cross-repo situation report: the context bus any agent session
+  runs at start (commits everywhere, standing issues, pending prompts).
+- **`devup2`** — thread-keyed tmux cockpits (Claude + codex windows per thread),
+  replacing one-session-per-repo sprawl.
+- **`codex-exec`** — reliable non-interactive codex dispatch (sandboxed,
+  stdin-guarded, prompt-from-file).
+
 ## What it does
 
 **Every 2 hours (mechanical, plain bash — `housekeep.sh`):**

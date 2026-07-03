@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# gardener devup2 — THREAD-keyed cockpit tmux layout.
+#
+# Rationale (WORKING-METHOD.md §sessions): work is arc-shaped and spans repos, so
+# sessions are keyed to THREADS, not repos. Each cockpit session has a Claude
+# window (rooted in the HUB repo, where the project memory/conventions live) and
+# a codex window; agents work across all repos from there. Cross-session
+# awareness comes from `sitrep`, not from more sessions.
+#
+#   Alt-q <first cockpit>   Alt-w <second>   (Alt-e third, if configured)
+#   Alt-1 claude window · Alt-2 codex window
+#
+# Config (~/.config/gardener/config, all optional):
+#   HUB_REPO=/path/to/hub      # default: first repo in ~/.config/gardener/repos
+#   COCKPITS="main side"       # session names, space-separated (default: main side)
+#   CLAUDE_CMD='claude --dangerously-skip-permissions'
+#   CODEX_CMD='codex --yolo'
+set -euo pipefail
+
+CONFIG_DIR="${GARDENER_CONFIG_DIR:-$HOME/.config/gardener}"
+[[ -f "$CONFIG_DIR/config" ]] && source "$CONFIG_DIR/config"
+
+CLAUDE_CMD="${CLAUDE_CMD:-claude --dangerously-skip-permissions}"
+CODEX_CMD="${CODEX_CMD:-codex --yolo}"
+COCKPITS="${COCKPITS:-main side}"
+if [[ -z "${HUB_REPO:-}" ]]; then
+    HUB_REPO=$(grep -vE '^\s*(#|$)' "$CONFIG_DIR/repos" 2>/dev/null | head -1 | sed "s|^~|$HOME|")
+fi
+HUB_REPO="${HUB_REPO:-$HOME}"
+
+read -ra SESSIONS <<<"$COCKPITS"
+
+start() {
+    local session=$1
+    tmux has-session -t "=$session" 2>/dev/null && return 0
+    tmux new-session -d -s "$session" -n cc -c "$HUB_REPO"
+    tmux send-keys -t "$session:cc" "$CLAUDE_CMD" C-m
+    tmux new-window -t "$session" -n cdx -c "$HUB_REPO"
+    tmux send-keys -t "$session:cdx" "$CODEX_CMD" C-m
+}
+
+bindings() {
+    tmux bind -n M-1 select-window -t cc
+    tmux bind -n M-2 select-window -t cdx
+    local keys=(q w e r) i=0
+    for s in "${SESSIONS[@]}"; do
+        ((i < ${#keys[@]})) && tmux bind -n "M-${keys[$i]}" switch-client -t "$s"
+        ((i++)) || true
+    done
+}
+
+build() { for s in "${SESSIONS[@]}"; do start "$s"; done; bindings; }
+
+teardown() {
+    local running=()
+    for s in "${SESSIONS[@]}"; do
+        tmux has-session -t "=$s" 2>/dev/null && running+=("$s")
+    done
+    ((${#running[@]})) || { echo "nothing to kill"; return 0; }
+    echo "about to kill: ${running[*]} (stops their claude/codex processes)"
+    read -rp "proceed? [y/N] " ans
+    [[ "$ans" == [yY] ]] || { echo aborted; return 0; }
+    for s in "${running[@]}"; do tmux kill-session -t "=$s"; echo "killed: $s"; done
+}
+
+attach() {
+    local target="${SESSIONS[0]}"
+    if [[ -n "${TMUX:-}" ]]; then tmux switch-client -t "$target"; else tmux attach -t "$target"; fi
+}
+
+case "${1:-up}" in
+    up)        build; attach ;;
+    --down)    teardown ;;
+    --restart) teardown; build; attach ;;
+    *) echo "usage: devup2 [up | --down | --restart]"; exit 1 ;;
+esac

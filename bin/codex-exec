@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# gardener codex-exec — reliable non-interactive codex invocation (from a Claude
+# cockpit, a cron, or any script).
+#
+# Encapsulates two hard-won fixes:
+#   1. sandbox: codex's Linux sandbox (bubblewrap) needs unprivileged user
+#      namespaces; on Ubuntu 24.04+ that requires an AppArmor profile for bwrap
+#      (see gardener WORKING-METHOD.md "Host setup"). With that in place the
+#      sandbox WORKS — never fall back to --dangerously-bypass flags.
+#   2. stdin: `codex exec` reads stdin; a backgrounded call without redirection
+#      can hang until killed. Always </dev/null here.
+#
+# Usage:
+#   codex-exec <prompt-file> [--cd <dir>] [--write] [--timeout <secs>]
+# The prompt comes from a FILE (keeps shell-quoting sane, transcript reviewable).
+
+set -uo pipefail
+
+PROMPT_FILE="${1:?usage: codex-exec <prompt-file> [--cd dir] [--write] [--timeout secs]}"
+shift
+CD_DIR="$HOME"
+SANDBOX="read-only"
+TIMEOUT=600
+
+while (($#)); do
+    case "$1" in
+        --cd)      CD_DIR="$2"; shift 2 ;;
+        --write)   SANDBOX="workspace-write"; shift ;;
+        --timeout) TIMEOUT="$2"; shift 2 ;;
+        *) echo "unknown arg: $1" >&2; exit 2 ;;
+    esac
+done
+
+[[ -r "$PROMPT_FILE" ]] || { echo "prompt file not readable: $PROMPT_FILE" >&2; exit 2; }
+
+exec timeout "$TIMEOUT" codex exec \
+    --sandbox "$SANDBOX" \
+    --skip-git-repo-check \
+    --cd "$CD_DIR" \
+    "$(cat "$PROMPT_FILE")" </dev/null
