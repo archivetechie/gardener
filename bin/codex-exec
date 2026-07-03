@@ -26,12 +26,17 @@ while (($#)); do
     case "$1" in
         --cd)      CD_DIR="$2"; shift 2 ;;
         --write)   SANDBOX="workspace-write"; shift ;;
+        --full)    SANDBOX="danger-full-access"; shift ;;  # network/system access; use for impl phases that need it
         --timeout) TIMEOUT="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
 [[ -r "$PROMPT_FILE" ]] || { echo "prompt file not readable: $PROMPT_FILE" >&2; exit 2; }
+
+# The workspace-write sandbox denies ~/.cache; uv needs a writable cache or it
+# fails/hangs acquiring locks (root cause of the 2026-07-03 "hanging suite").
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache-codex}"
 
 exec timeout "$TIMEOUT" codex exec \
     --sandbox "$SANDBOX" \
