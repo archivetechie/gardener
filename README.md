@@ -43,6 +43,20 @@ routing). New tools in `bin/`:
 - Reports stale unmerged branches and status-tracking drift, appends a one-section
   summary to the repo's `journal/` if it has one
 
+**Once a night (documentation, optional — `docsmith.sh`, needs the Claude Code CLI):**
+- Visits ONE repository per night (round-robin over `docsmith-repos`) and runs a
+  headless agent whose only job is documentation excellence: motivation-first
+  READMEs, install/quickstart/API guides, plain language, everything **derived
+  from the code, never from other docs**
+- Binds prose to code with **anchor comments**
+  (`<!-- code-anchor: src/foo.rs @ <commit> -->`); the `docsmith-drift` tool
+  reports every section whose anchored code changed since it was written, and
+  stale sections are regenerated first on the next visit — high-level docs get
+  the "javadoc property": code moves, docs follow
+- Keeps a per-repo backlog notebook in `~/.local/state/gardener/docsmith/` so
+  each night is one bounded increment; commits doc files only (`auto(docs): …`),
+  a post-run guard flags any non-doc change loudly; pushing stays with housekeep
+
 Logs live in `~/.local/state/gardener/`. Config in `~/.config/gardener/`.
 
 ## Install
@@ -118,8 +132,14 @@ stays interpretable.
 IDLE_MIN=30                    # quiet minutes before auto-commit
 DAILY_MODEL=claude-sonnet-4-6  # model for the daily layer
 DAILY_MAX_TURNS=40
+DOCSMITH_MODEL=claude-sonnet-5 # model for the nightly docs layer
+DOCSMITH_MAX_TURNS=80
 AUTHOR_TRAILER="Co-Authored-By: ..."   # trailer for auto commits
 ```
+
+`~/.config/gardener/docsmith-repos` — the docs layer's rotation list (defaults to
+the managed repos file if absent). May include local-only repos: docsmith just
+commits; pushing happens wherever a remote exists.
 
 ## Uninstall
 

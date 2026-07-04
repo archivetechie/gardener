@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# docsmith-drift — report doc sections whose anchored code has changed.
+#
+# Docs bind prose to code with anchor comments (written by docsmith, invisible
+# to readers):
+#   <!-- code-anchor: src/catalog.rs src/cli @ 4b44c43 -->
+# meaning "this section was verified against those paths at that commit".
+# This tool scans all tracked *.md files in a repo and prints every anchor whose
+# paths have changed between the recorded commit and HEAD — i.e. prose that may
+# no longer match the code. `<!-- code-anchor: none -->` marks deliberately
+# unbound narrative sections and is skipped.
+#
+# Usage: docsmith-drift [repo-dir]     (default: current directory)
+# Exit: 0 = no drift, 1 = stale anchors found, 2 = usage/repo error.
+
+set -uo pipefail
+repo="${1:-.}"
+cd "$repo" 2>/dev/null || { echo "docsmith-drift: no such directory: $repo" >&2; exit 2; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "docsmith-drift: not a git repo: $repo" >&2; exit 2; }
+
+stale=0 total=0
+while IFS=: read -r file line content; do
+    # content looks like: <!-- code-anchor: path1 path2 @ hash -->
+    spec="${content#*code-anchor:}"
+    spec="${spec%-->*}"
+    spec="$(echo "$spec" | xargs)"                    # trim
+    [[ "$spec" == "none" ]] && continue
+    total=$((total + 1))
+    paths="${spec% @ *}"
+    base="${spec##* @ }"
+    if [[ -z "$paths" || -z "$base" || "$paths" == "$spec" ]]; then
+        echo "MALFORMED $file:$line — '$content' (want: <!-- code-anchor: <paths> @ <commit> -->)"
+        stale=$((stale + 1)); continue
+    fi
+    if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+        echo "UNKNOWN-BASE $file:$line — commit $base not found; re-verify section against HEAD"
+        stale=$((stale + 1)); continue
+    fi
+    # shellcheck disable=SC2086 — paths are intentionally word-split
+    changed=$(git diff --name-only "$base" HEAD -- $paths | wc -l)
+    if (( changed > 0 )); then
+        echo "STALE $file:$line — $paths @ $base ($changed file(s) changed since)"
+        stale=$((stale + 1))
+    fi
+done < <(git ls-files '*.md' | xargs -r grep -Hn 'code-anchor:' 2>/dev/null)
+
+echo "docsmith-drift: $total anchor(s) checked, $stale stale/problem"
+(( stale > 0 )) && exit 1 || exit 0
