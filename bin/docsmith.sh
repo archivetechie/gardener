@@ -64,6 +64,8 @@ done
 echo "$repo" >"$CURSOR"
 
 name=$(basename "$repo")
+# ~/sutradhara/repo-style layouts: the generic dir name would collide/confuse.
+[[ "$name" == "repo" ]] && name=$(basename "$(dirname "$repo")")
 notebook="$STATE_DIR/notebook-$name.md"
 TEMPLATE_DIR="$(cd "$BIN_DIR/../templates" && pwd)"
 PROMPT=$(sed -e "s|{{REPO}}|$repo|g" -e "s|{{STATE_FILE}}|$notebook|g" \
