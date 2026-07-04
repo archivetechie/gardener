@@ -42,7 +42,7 @@ start() {
 bindings() {
     tmux bind -n M-1 select-window -t cc
     tmux bind -n M-2 select-window -t cdx
-    local keys=(q w e r) i=0
+    local keys=(q w e r t) i=0
     for s in "${SESSIONS[@]}"; do
         ((i < ${#keys[@]})) && tmux bind -n "M-${keys[$i]}" switch-client -t "$s"
         ((i++)) || true
