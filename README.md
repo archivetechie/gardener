@@ -26,6 +26,10 @@ routing). New tools in `bin/`:
 - **`codex-exec`** — reliable non-interactive codex dispatch (sandboxed,
   stdin-guarded, prompt-from-file).
 
+Full flags, config keys, and gotchas for every tool (including how to enable
+the nightly docs layer, which has no `gardener install` switch of its own) are
+in **[TOOLS.md](TOOLS.md)**.
+
 ## What it does
 
 **Every 2 hours (mechanical, plain bash — `housekeep.sh`):**

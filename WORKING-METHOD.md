@@ -96,7 +96,8 @@ chrome binary if browser QA runs on the host.
 
 - Docs live in the repo they pertain to; every repo has a `docs/INDEX.md`
   registry with statuses (`current | implemented | superseded | historical`);
-  implemented prompts move to `docs/archive/`.
+  implemented prompts move to `docs/historical/`, entirely separate from
+  current docs.
 - `AGENTS.md` per repo = the implementation agent's definition of done: run what
   you changed and paste outputs; always commit; scenario-or-cover for new
   capabilities; contracts referenced, never inlined; expect the diff gate.
