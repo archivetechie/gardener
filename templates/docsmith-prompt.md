@@ -73,7 +73,10 @@ which code the section describes and the commit at which it was verified:
 ## Repository conventions (respect them)
 
 - If the repo has `docs/INDEX.md` with status fields (current / implemented /
-  superseded / historical), keep it consistent. Design docs, codex prompts, and
+  superseded / historical), keep it consistent. Docs with status historical,
+  superseded, or implemented live in `docs/historical/`, entirely separate from
+  current docs — move strays there via `git mv`, updating INDEX and links.
+  Design docs, codex prompts, and
   process docs are **historical record — do not rewrite their content**; your
   domain is user-facing documentation: README, guides, reference, architecture
   overviews. You may ADD new user-facing docs (e.g. `docs/guide-*.md`,

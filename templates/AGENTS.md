@@ -11,7 +11,7 @@
    branch named `wip/<topic>` and say so.
 3. **Update `docs/INDEX.md`** — mark the prompt you implemented as `implemented`;
    add any docs you created.
-4. Don't touch `docs/archive/` or any generated files the project regenerates.
+4. Don't touch `docs/historical/` or any generated files the project regenerates.
 
 ## Background automation you should know about
 A `gardener` cron may auto-commit idle changes (`auto(checkpoint)` messages).

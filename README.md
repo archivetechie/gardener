@@ -88,8 +88,9 @@ seeds three small files (skipping any that exist):
 - **`AGENTS.md`** — the implementer's contract (read by codex & co.): run what you
   changed and paste the output, always commit, never leave the tree dirty, update
   the docs index.
-- **`docs/INDEX.md` + `docs/archive/`** — the docs lifecycle: every doc has a
-  status; finished prompts and superseded designs get archived, not deleted.
+- **`docs/INDEX.md` + `docs/historical/`** — the docs lifecycle: every doc has a
+  status; finished prompts and superseded designs move to `docs/historical/`,
+  entirely separate from current docs — kept, never deleted.
 
 Fill the `{{...}}` blanks, commit, done.
 

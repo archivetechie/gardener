@@ -58,10 +58,10 @@ case "$cmd" in
                 echo "✓ seeded $t"
             fi
         done
-        mkdir -p "$p/docs/archive"
+        mkdir -p "$p/docs/historical"
         if [[ ! -e "$p/docs/INDEX.md" ]]; then
             sed "s|{{REPO_NAME}}|$name|g" "$GARDENER_HOME/templates/docs-INDEX.md" >"$p/docs/INDEX.md"
-            echo "✓ seeded docs/INDEX.md (+ docs/archive/)"
+            echo "✓ seeded docs/INDEX.md (+ docs/historical/)"
         fi
         "$0" add "$p"
         echo "→ review the seeded files, fill the {{...}} blanks, then commit."

@@ -26,8 +26,8 @@ hops are cheap.
 
 ## Docs lifecycle
 `docs/INDEX.md` is the registry: every doc is `current | implemented | superseded |
-historical`. Completed/superseded docs move to `docs/archive/` (history kept, noise
-out). Update INDEX when adding or completing a doc.
+historical`. Completed/superseded docs move to `docs/historical/` (history kept,
+entirely separate from current docs). Update INDEX when adding or completing a doc.
 
 ## Running / verifying
 {{HOW_TO_RUN: build command, test command, and the ONE verification command whose

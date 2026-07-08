@@ -8,8 +8,9 @@ Do, in order:
    summary. Note repos repeatedly skipped as "dirty but active".
 2. For each repo that has a `docs/INDEX.md`: classify any unlisted docs in `docs/`;
    move docs whose purpose is complete (e.g. implementation prompts whose acceptance
-   criteria are now met — check the repo's status/board files) to `docs/archive/`
-   via `git mv`, updating INDEX.
+   criteria are now met — check the repo's status/board files) to `docs/historical/`
+   via `git mv`, updating INDEX. (Fold any legacy `docs/archive/` contents into
+   `docs/historical/` when you meet them — one folder for everything non-current.)
 3. List unmerged branches (`git branch --no-merged <default>`) per repo with
    last-commit age. Never delete unmerged branches — report ones older than 14 days.
 4. If a repo tracks work status in a board/registry file (e.g. GAPBOARD.md,
