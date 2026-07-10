@@ -259,11 +259,11 @@ Config keys, read from `~/.config/gardener/config`:
 | `CLAUDE_CMD` | `claude --dangerously-skip-permissions` | Command for the `cc` window |
 | `CODEX_CMD` | `codex --yolo` | Command for the `cdx` window |
 
-<!-- code-anchor: bin/codex-exec @ 695bf46 -->
+<!-- code-anchor: bin/codex-exec @ febf1e7 -->
 ## `codex-exec` — reliable non-interactive codex
 
 ```
-codex-exec <prompt-file> [--cd <dir>] [--write] [--full] [--timeout <secs>]
+codex-exec <prompt-file> [--cd <dir>] [--write] [--full] [--timeout <secs>] [--model <id>]
 ```
 
 A thin wrapper around `codex exec` that fixes two footguns:
@@ -286,6 +286,7 @@ stays sane and the transcript is reviewable. Flags:
 | `--write` | Sandbox `workspace-write` instead of the default `read-only` |
 | `--full` | Sandbox `danger-full-access` (network/system access) — for implementation phases that need it |
 | `--timeout <secs>` | Kill codex if it hasn't finished after this many seconds (default 600) |
+| `--model <id>` | Pin the model for this dispatch only (passed through as `codex exec --model <id>`); omit to use codex's own default |
 
 It also sets `UV_CACHE_DIR` to `/tmp/uv-cache-codex` if unset — the
 `workspace-write` sandbox denies `~/.cache`, and `uv` hangs acquiring a cache

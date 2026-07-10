@@ -11,6 +11,11 @@ Born from a real workflow: one human + Claude (design/review) + Codex
 between threads. The hygiene debt that pattern generates is exactly what gardener
 automates.
 
+New to gardener? **[GETTING-STARTED.md](GETTING-STARTED.md)** is the full
+walkthrough — what it is, install, the config files, how to verify it's
+running, and how each layer (including the nightly docs layer, which has no
+install flag yet) gets turned on. This README stays the quick version.
+
 ## Beyond hygiene: the full working method
 
 Gardener grew into the home of the whole way of working — see
