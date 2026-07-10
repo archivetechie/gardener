@@ -11,7 +11,7 @@
 #      can hang until killed. Always </dev/null here.
 #
 # Usage:
-#   codex-exec <prompt-file> [--cd <dir>] [--write] [--timeout <secs>]
+#   codex-exec <prompt-file> [--cd <dir>] [--write] [--timeout <secs>] [--model <id>]
 # The prompt comes from a FILE (keeps shell-quoting sane, transcript reviewable).
 
 set -uo pipefail
@@ -21,6 +21,7 @@ shift
 CD_DIR="$HOME"
 SANDBOX="read-only"
 TIMEOUT=600
+MODEL=""
 
 while (($#)); do
     case "$1" in
@@ -28,6 +29,7 @@ while (($#)); do
         --write)   SANDBOX="workspace-write"; shift ;;
         --full)    SANDBOX="danger-full-access"; shift ;;  # network/system access; use for impl phases that need it
         --timeout) TIMEOUT="$2"; shift 2 ;;
+        --model)   MODEL="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -38,8 +40,12 @@ done
 # fails/hangs acquiring locks (root cause of the 2026-07-03 "hanging suite").
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache-codex}"
 
+MODEL_ARGS=()
+[[ -n "$MODEL" ]] && MODEL_ARGS=(--model "$MODEL")
+
 exec timeout "$TIMEOUT" codex exec \
     --sandbox "$SANDBOX" \
     --skip-git-repo-check \
     --cd "$CD_DIR" \
+    "${MODEL_ARGS[@]}" \
     "$(cat "$PROMPT_FILE")" </dev/null
