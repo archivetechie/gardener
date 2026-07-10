@@ -43,6 +43,30 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache-codex}"
 MODEL_ARGS=()
 [[ -n "$MODEL" ]] && MODEL_ARGS=(--model "$MODEL")
 
+# --- Serialization lease -------------------------------------------------
+# One codex-exec at a time across the whole box: protects the shared
+# gpt-5.6-sol quota (no two runs competing for tokens) and prevents the
+# parallel-worktree collisions we've been bitten by. Blocks until the lock is
+# free, then dispatches; the lock auto-releases when this process exits — even
+# on SIGKILL — so there are no stale locks. Order is by arrival: whoever is
+# waiting when the holder finishes goes next, so a backlog drains one-by-one.
+# Bypass a single run with CODEX_EXEC_NOLOCK=1 when you deliberately want
+# parallelism (e.g. a multi-lens panel).
+if [[ "${CODEX_EXEC_NOLOCK:-0}" != "1" ]] && command -v flock >/dev/null 2>&1; then
+    CODEX_EXEC_LOCK="${CODEX_EXEC_LOCK:-$HOME/.codex/codex-exec.lock}"
+    if ( : >>"$CODEX_EXEC_LOCK" ) 2>/dev/null; then
+        exec 9>>"$CODEX_EXEC_LOCK"           # fd 9 survives the exec below → held for codex's lifetime
+        echo "codex-exec: acquiring codex lease ($CODEX_EXEC_LOCK)…" >&2
+        if flock -w 90000 9; then
+            echo "codex-exec: lease acquired, dispatching." >&2
+        else
+            echo "codex-exec: WARN lease wait exceeded 25h; proceeding unserialized." >&2
+        fi
+    else
+        echo "codex-exec: WARN cannot open lease $CODEX_EXEC_LOCK; running unserialized." >&2
+    fi
+fi
+
 exec timeout "$TIMEOUT" codex exec \
     --sandbox "$SANDBOX" \
     --skip-git-repo-check \
