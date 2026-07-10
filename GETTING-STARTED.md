@@ -231,8 +231,9 @@ empty, `housekeep.sh` logs `no repos file at ... — nothing to do` and exits
 a dirty repo if its newest changed file's mtime is inside the `IDLE_MIN`
 window (default 30 minutes) — look for `dirty but active (newest change
 ...m ago) — skipping commit` in `housekeep.log`. This is by design (never
-snapshot mid-edit); wait, or lower `IDLE_MIN` in `~/.config/gardener/config`
-if 30 minutes is too conservative for your workflow. It also silently skips
+snapshot mid-edit) — wait it out, or lower `IDLE_MIN` in
+`~/.config/gardener/config` if 30 minutes is too conservative for your
+workflow. It also silently skips
 repos that are mid-merge/rebase or on a detached HEAD — the log will say so
 explicitly.
 
