@@ -6,6 +6,7 @@ captures the *whole* method — gardener's hygiene automation is one piece of it
 Evolved in production July 2026; the canonical, living process docs stay in the
 hub repo's `docs/` (this file is the portable map).
 
+<!-- code-anchor: none -->
 ## The loop
 
 ```
@@ -37,6 +38,7 @@ Key principles discovered the hard way:
   Panels of mid-tier lenses out-find a single top-tier reviewer; save the top
   tier for synthesis, strategy, and genuinely hard design (model-economy doc).
 
+<!-- code-anchor: bin/devup2 @ fda5814 -->
 ## Sessions: thread-keyed cockpits (`bin/devup2`)
 
 Work is arc-shaped and spans repos, so agent sessions are keyed to THREADS, not
@@ -52,6 +54,7 @@ conversation blind → constant rediscovery. "Wrong-session" work was never a
 correctness problem (artifacts land in the right repos); it was a *sync* problem
 — solved by a bus, not by more sessions.
 
+<!-- code-anchor: bin/sitrep @ fda5814 -->
 ## The context bus (`bin/sitrep`)
 
 Deterministic, no-LLM, ~1s report any session runs at start or after a gap:
@@ -60,20 +63,33 @@ board headline/halts, pending prompts, today's journal. Durable state stays in
 the repos (docs INDEX, STANDING, journal, git history); sitrep makes it ambient.
 Wire it into the hub repo's CLAUDE.md and AGENTS.md so both agents use it.
 
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/gardener @ fda5814 -->
 ## Hygiene (the original gardener core)
 
 - `housekeep.sh` every 2h: idle-aware auto-commit, push (never force), prune
   merged branches. Agents commit at every green milestone; the checkpointer is
   the backstop, not the habit.
-- `daily.sh` once a day (LLM judgment, cheap model): docs INDEX/archive
+- `daily.sh` once a day (LLM judgment, cheap model): docs INDEX/`docs/historical/`
   maintenance, push repair, regression call-outs, STANDING.md upkeep, journal.
 - Weekly brief (top-tier model, bounded turns): state-of-program, ranked next
-  moves, the business-decision queue — the one scheduled top-tier spend.
+  moves, the business-decision queue — the one scheduled top-tier spend. **Not
+  part of this repo** — there's no `bin/weekly-brief.sh` here and no
+  `gardener install` flag for it. It's a standalone script per hub repo, wired
+  in with its own manual crontab line, the same pattern as docsmith's own
+  hand-added cron line (see
+  [GETTING-STARTED.md](GETTING-STARTED.md#the-weekly-brief-is-not-part-of-this-repo)).
 
+<!-- code-anchor: bin/codex-exec @ fda5814 -->
 ## Dispatching codex reliably (`bin/codex-exec`)
 
 Non-interactive codex from scripts/cockpits: prompt from a file, stdin guarded
-(`</dev/null` — `codex exec` reads stdin and hangs otherwise), sandbox ON.
+(`</dev/null` — `codex exec` reads stdin and hangs otherwise), sandbox ON. Also
+serializes: only one `codex-exec` runs at a time on the box (an `flock` lease,
+auto-released on any exit including `SIGKILL`), to protect a shared model quota
+and avoid parallel-worktree collisions. Bypass for one call with
+`CODEX_EXEC_NOLOCK=1` when you deliberately want several dispatches running at
+once (e.g. a multi-lens review panel) — see [TOOLS.md](TOOLS.md) for the full
+flag/env-var reference.
 
 **Host setup (Ubuntu 24.04+):** unprivileged user namespaces are AppArmor-
 restricted, which breaks codex's bubblewrap sandbox and Chromium sandboxes.
@@ -92,6 +108,7 @@ profile bwrap /usr/bin/bwrap flags=(unconfined) {
 then `apparmor_parser -r /etc/apparmor.d/bwrap`. Same pattern for a headless-
 chrome binary if browser QA runs on the host.
 
+<!-- code-anchor: bin/gardener templates/AGENTS.md templates/docs-INDEX.md @ fda5814 -->
 ## Conventions that hold it together
 
 - Docs live in the repo they pertain to; every repo has a `docs/INDEX.md`

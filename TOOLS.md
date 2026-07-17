@@ -259,14 +259,15 @@ Config keys, read from `~/.config/gardener/config`:
 | `CLAUDE_CMD` | `claude --dangerously-skip-permissions` | Command for the `cc` window |
 | `CODEX_CMD` | `codex --yolo` | Command for the `cdx` window |
 
-<!-- code-anchor: bin/codex-exec @ febf1e7 -->
+<!-- code-anchor: bin/codex-exec @ fda5814 -->
 ## `codex-exec` — reliable non-interactive codex
 
 ```
 codex-exec <prompt-file> [--cd <dir>] [--write] [--full] [--timeout <secs>] [--model <id>]
 ```
 
-A thin wrapper around `codex exec` that fixes two footguns:
+A thin wrapper around `codex exec` that fixes two footguns and serializes
+dispatches:
 
 - **Stdin**: `codex exec` reads stdin, so a backgrounded/cron call without
   redirection can hang forever. This wrapper always runs with `</dev/null`.
@@ -276,6 +277,21 @@ A thin wrapper around `codex exec` that fixes two footguns:
   [WORKING-METHOD.md](WORKING-METHOD.md). With that fix in place the real
   sandbox works, so this wrapper never falls back to a `--dangerously-bypass`
   flag.
+- **Serialization**: only one `codex-exec` runs at a time on the box. Before
+  dispatching, it takes an `flock` lease on `~/.codex/codex-exec.lock` (fd 9,
+  opened with `exec 9>>...` so the lock survives the `exec` into `codex` and
+  auto-releases whenever the process exits — including `SIGKILL`, so no lock
+  can go stale). If another `codex-exec` is already holding the lease, this
+  one blocks until it's free; a backlog of waiters drains one-by-one in
+  arrival order. This exists to protect a shared codex model quota from two
+  runs competing for tokens, and to avoid collisions between codex processes
+  running in parallel worktrees. A run that waits more than 25 hours
+  (`flock -w 90000`) gives up waiting and proceeds unserialized rather than
+  blocking forever, logging a `WARN` to stderr. If `flock` isn't installed, or
+  the lock file can't be opened, it also proceeds unserialized with a `WARN`.
+  Set `CODEX_EXEC_NOLOCK=1` to skip the lease entirely for a single call —
+  e.g. when you deliberately want several codex dispatches running in
+  parallel, such as a multi-lens review panel.
 
 The prompt is read from `<prompt-file>` (not a shell argument), so quoting
 stays sane and the transcript is reviewable. Flags:
@@ -291,3 +307,10 @@ stays sane and the transcript is reviewable. Flags:
 It also sets `UV_CACHE_DIR` to `/tmp/uv-cache-codex` if unset — the
 `workspace-write` sandbox denies `~/.cache`, and `uv` hangs acquiring a cache
 lock without a writable cache dir.
+
+Env vars (not flags — set these in the calling shell/cron line):
+
+| Var | Default | Meaning |
+|---|---|---|
+| `CODEX_EXEC_NOLOCK` | unset | Set to `1` to skip the serialization lease for this call and dispatch immediately, even if another `codex-exec` is running |
+| `CODEX_EXEC_LOCK` | `~/.codex/codex-exec.lock` | Path to the lease file; override only if you deliberately want a separate serialization group |
