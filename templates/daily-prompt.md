@@ -29,4 +29,7 @@ Do, in order:
    to today's `journal/YYYY-MM-DD.md` summarizing what you did (or one line:
    "nothing to do").
 7. Commit any changes you made with message prefix "auto(daily): " and push.
+   Attribution rule (Swami 2026-07-19): commits in the archivetechie repos carry
+   NO AI co-author trailers (no "Co-Authored-By: Claude/GPT/..." lines) — the
+   work is multi-model and is attributed to The ArchiveTech Project only.
    Leave every working tree as clean as you found it or cleaner.
