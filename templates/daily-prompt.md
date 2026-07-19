@@ -29,6 +29,10 @@ Do, in order:
    to today's `journal/YYYY-MM-DD.md` summarizing what you did (or one line:
    "nothing to do").
 7. Commit any changes you made with message prefix "auto(daily): " and push.
+   Public/private doc split (Swami 2026-07-19): working docs (designs, prompts,
+   consults, reports, process records) belong in ~/system/journal/<repo>/, NEVER
+   in the public repos' docs/ — public repos carry distilled docs only. No
+   personal names or /home/<user> paths in public content or commit messages.
    Attribution rule (Swami 2026-07-19): commits in the archivetechie repos carry
    NO AI co-author trailers (no "Co-Authored-By: Claude/GPT/..." lines) — the
    work is multi-model and is attributed to The ArchiveTech Project only.
