@@ -91,7 +91,7 @@ immediately), set the environment variable `IDLE_MIN_OVERRIDE` when invoking:
 The log (`~/.local/state/gardener/housekeep.log`) is tail-truncated to the last
 2000 lines on every run, so it can't grow without bound.
 
-<!-- code-anchor: bin/daily.sh templates/daily-prompt.md @ 695bf46 -->
+<!-- code-anchor: bin/daily.sh templates/daily-prompt.md @ 780381c -->
 ## `daily.sh` — the judgment layer
 
 Runs standalone (`gardener daily`) or from the `--daily` cron entry, once a day
@@ -112,7 +112,17 @@ unmerged branches older than 14 days (never deletes them); reconciles a repo's
 status-tracking files against reality and calls out regressions; maintains a
 `STANDING.md` issues ledger where present (escalates anything open 3+ days into
 a fix prompt); and appends a summary to `journal/YYYY-MM-DD.md` if the repo has
-a `journal/` directory. It commits with `auto(daily): ` and pushes.
+a `journal/` directory. It commits with `auto(daily): ` and pushes, leaving
+every working tree as clean as it found it or cleaner.
+
+Two commit conventions are baked into the prompt template as well: working
+documents (designs, prompts, consults, reports, process records) belong in
+`~/system/journal/<repo>/`, never in a public repo's `docs/` — a public repo's
+`docs/` carries distilled docs only, and public content or commit messages must
+not include personal names or `/home/<user>` paths. And in the archivetechie
+repos specifically, commits carry no AI co-author trailer (no
+`Co-Authored-By: Claude/GPT/...` line) — that work is attributed to The
+ArchiveTech Project only, not to whichever model produced it.
 
 Config keys:
 

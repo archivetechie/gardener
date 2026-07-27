@@ -35,6 +35,7 @@ Full flags, config keys, and gotchas for every tool (including how to enable
 the nightly docs layer, which has no `gardener install` switch of its own) are
 in **[TOOLS.md](TOOLS.md)**.
 
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 780381c -->
 ## What it does
 
 **Every 2 hours (mechanical, plain bash — `housekeep.sh`):**
@@ -68,6 +69,7 @@ in **[TOOLS.md](TOOLS.md)**.
 
 Logs live in `~/.local/state/gardener/`. Config in `~/.config/gardener/`.
 
+<!-- code-anchor: bin/gardener @ 780381c -->
 ## Install
 
 ```bash
@@ -82,6 +84,7 @@ gardener install --daily                   # + the daily AI layer at 02:30
 That's it. `gardener status` shows what's managed and each repo's dirty/ahead state;
 `gardener log` tails what it's been doing; `gardener run` forces a pass now.
 
+<!-- code-anchor: bin/gardener templates/CLAUDE.md templates/AGENTS.md templates/docs-INDEX.md @ 780381c -->
 ## Adopt the full workflow in a repo
 
 ```bash
@@ -103,6 +106,7 @@ seeds three small files (skipping any that exist):
 
 Fill the `{{...}}` blanks, commit, done.
 
+<!-- code-anchor: none -->
 ## The working pattern (the part worth stealing)
 
 1. **Human + Claude brainstorm** until the design is real. The design lands as a
@@ -120,6 +124,7 @@ Fill the `{{...}}` blanks, commit, done.
 
 The human's only jobs: have ideas, make decisions, and hop between threads at will.
 
+<!-- code-anchor: bin/housekeep.sh @ 780381c -->
 ## Safety properties (the invariants — don't weaken them)
 
 | Concern | Guarantee |
@@ -133,6 +138,7 @@ The human's only jobs: have ideas, make decisions, and hop between threads at wi
 Auto-commits are clearly tagged (`auto(checkpoint)`, `auto(daily)`) so history
 stays interpretable.
 
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 780381c -->
 ## Configuration
 
 `~/.config/gardener/repos` — one absolute path per line (`#` comments fine).
