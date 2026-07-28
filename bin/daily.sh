@@ -6,6 +6,7 @@
 # Optional — requires the `claude` CLI. Enable via `gardener install --daily`.
 # Config (~/.config/gardener/config): DAILY_MODEL=claude-sonnet-4-6  DAILY_MAX_TURNS=40
 
+export TZ=UTC  # UTC commit timestamps (archivetechie policy 2026-07-28)
 set -uo pipefail
 
 CONFIG_DIR="${GARDENER_CONFIG_DIR:-$HOME/.config/gardener}"

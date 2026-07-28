@@ -16,6 +16,7 @@
 #
 # Run from cron (gardener install) or manually: gardener run
 
+export TZ=UTC  # UTC commit timestamps (archivetechie policy 2026-07-28)
 set -uo pipefail
 
 # Cron has no SSH agent; pushes to SSH remotes need the keychain-held key.
