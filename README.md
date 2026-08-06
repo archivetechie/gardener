@@ -35,7 +35,7 @@ Full flags, config keys, and gotchas for every tool (including how to enable
 the nightly docs layer, which has no `gardener install` switch of its own) are
 in **[TOOLS.md](TOOLS.md)**.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 780381c -->
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
 ## What it does
 
 **Every 2 hours (mechanical, plain bash — `housekeep.sh`):**
@@ -124,7 +124,7 @@ Fill the `{{...}}` blanks, commit, done.
 
 The human's only jobs: have ideas, make decisions, and hop between threads at will.
 
-<!-- code-anchor: bin/housekeep.sh @ 780381c -->
+<!-- code-anchor: bin/housekeep.sh @ 563bea4 -->
 ## Safety properties (the invariants — don't weaken them)
 
 | Concern | Guarantee |
@@ -138,7 +138,7 @@ The human's only jobs: have ideas, make decisions, and hop between threads at wi
 Auto-commits are clearly tagged (`auto(checkpoint)`, `auto(daily)`) so history
 stays interpretable.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 780381c -->
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
 ## Configuration
 
 `~/.config/gardener/repos` — one absolute path per line (`#` comments fine).

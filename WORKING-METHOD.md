@@ -54,7 +54,7 @@ conversation blind → constant rediscovery. "Wrong-session" work was never a
 correctness problem (artifacts land in the right repos); it was a *sync* problem
 — solved by a bus, not by more sessions.
 
-<!-- code-anchor: bin/sitrep @ fda5814 -->
+<!-- code-anchor: bin/sitrep @ 563bea4 -->
 ## The context bus (`bin/sitrep`)
 
 Deterministic, no-LLM, ~1s report any session runs at start or after a gap:
@@ -63,7 +63,13 @@ board headline/halts, pending prompts, today's journal. Durable state stays in
 the repos (docs INDEX, STANDING, journal, git history); sitrep makes it ambient.
 Wire it into the hub repo's CLAUDE.md and AGENTS.md so both agents use it.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/gardener @ fda5814 -->
+It also reports drift on vendored contracts — files one repo deliberately
+keeps a hand-updated copy of from another (today: `sutradhara`'s copy of
+`remanence`'s `proto/layer5.proto`). The pair list is hardcoded in the script
+itself, not config; sitrep only reports the distance, never closes it — see
+[TOOLS.md](TOOLS.md) for the full mechanism.
+
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/gardener @ 563bea4 -->
 ## Hygiene (the original gardener core)
 
 - `housekeep.sh` every 2h: idle-aware auto-commit, push (never force), prune

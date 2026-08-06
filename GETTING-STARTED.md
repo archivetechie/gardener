@@ -48,7 +48,7 @@ on the state of things (weekly), and someone who occasionally repaints the
 signage so it still matches what's actually behind each door (nightly docs).
 None of them touch what you're building — only the paperwork around it.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ febf1e7 -->
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
 ## Before you start
 
 You need: `git`, `bash`, and a working `crontab` (`crontab -e` should open an
@@ -65,6 +65,11 @@ agent's keychain wrapper lives somewhere else, either symlink it to that
 path or push over HTTPS with a credential helper instead; there's currently
 no way to point gardener at a different keychain script short of editing the
 scripts themselves.
+
+`housekeep.sh` and `daily.sh` also each export `TZ=UTC` before doing
+anything else, so their log timestamps and any commits they make carry UTC
+time, not your machine's local time. This is hardcoded the same way the
+keychain path is — there's no config key to turn it off.
 
 <!-- code-anchor: bin/gardener @ febf1e7 -->
 ## Install
@@ -88,7 +93,7 @@ gardener's own cron lines — it greps for and removes any prior
 lines before appending fresh ones, so re-running it is always safe and
 nothing else on your crontab is touched.
 
-<!-- code-anchor: bin/gardener bin/housekeep.sh bin/daily.sh bin/docsmith.sh bin/devup2 @ febf1e7 -->
+<!-- code-anchor: bin/gardener bin/housekeep.sh bin/daily.sh bin/docsmith.sh bin/devup2 @ 563bea4 -->
 ## The config files
 
 Everything gardener reads lives under `~/.config/gardener/`. Nothing here is
@@ -136,7 +141,7 @@ job. If this file doesn't exist, docsmith just uses `repos`.
 None of these three files are created for you except `repos` — copy the
 blocks above and edit as needed.
 
-<!-- code-anchor: bin/gardener bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ febf1e7 -->
+<!-- code-anchor: bin/gardener bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
 ## How to verify it's running
 
 Five checks, cheapest first:
@@ -150,7 +155,10 @@ Five checks, cheapest first:
    (`30 2 * * * .../bin/daily.sh`) if you ran `install --daily`, and —
    separately, since nothing installs it for you — a docsmith line if you
    added one by hand (see the next section).
-3. **Log files, under `~/.local/state/gardener/`**:
+3. **Log files, under `~/.local/state/gardener/`**. Timestamps in
+   `housekeep.log` and `daily.log` are UTC, not local time (see
+   [above](#before-you-start)) — if a line's time looks off by a fixed
+   number of hours, that's why.
    - `housekeep.log` — every housekeep run appends here (tail-truncated to
      the last 2000 lines). Look for lines like `<repo> committed checkpoint`
      or `<repo> pushed <branch>`.
@@ -218,7 +226,7 @@ script analogous to `daily.sh` (headless `claude -p`, its own log under
 `~/.local/state/gardener/` or your hub repo's own state directory) and add
 its cron line by hand.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ febf1e7 -->
+<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
 ## Troubleshooting
 
 **Nothing in `housekeep.log`, ever.** Check the cron line exists

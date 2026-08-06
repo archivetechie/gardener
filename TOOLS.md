@@ -56,7 +56,7 @@ the `gardener` CLI at all — it has to be added to cron by hand (see the
 `docsmith.sh` section). `gardener install` only ever writes housekeep and daily
 cron lines.
 
-<!-- code-anchor: bin/housekeep.sh @ 695bf46 -->
+<!-- code-anchor: bin/housekeep.sh @ 563bea4 -->
 ## `housekeep.sh` — the mechanical layer
 
 Runs standalone (`gardener run`) or from the cron `gardener install` writes.
@@ -89,9 +89,13 @@ immediately), set the environment variable `IDLE_MIN_OVERRIDE` when invoking:
 `IDLE_MIN_OVERRIDE=0 gardener run`.
 
 The log (`~/.local/state/gardener/housekeep.log`) is tail-truncated to the last
-2000 lines on every run, so it can't grow without bound.
+2000 lines on every run, so it can't grow without bound. The script exports
+`TZ=UTC` before anything else runs, so both its log timestamps and the commit
+timestamps it produces are UTC, not the machine's local time — a policy
+adopted 2026-07-28 so commit history doesn't carry an implicit,
+machine-dependent timezone. There is no config key to opt out.
 
-<!-- code-anchor: bin/daily.sh templates/daily-prompt.md @ 780381c -->
+<!-- code-anchor: bin/daily.sh templates/daily-prompt.md @ 563bea4 -->
 ## `daily.sh` — the judgment layer
 
 Runs standalone (`gardener daily`) or from the `--daily` cron entry, once a day
@@ -132,6 +136,8 @@ Config keys:
 | `DAILY_MAX_TURNS` | `40` | Turn budget per run |
 
 Log: `~/.local/state/gardener/daily.log`, truncated to the last 3000 lines.
+Like `housekeep.sh`, it exports `TZ=UTC` at the top of the script, so its log
+timestamps and any commits it makes are UTC as well.
 
 <!-- code-anchor: bin/docsmith.sh templates/docsmith-prompt.md @ 695bf46 -->
 ## `docsmith.sh` — the nightly documentation layer
@@ -206,7 +212,7 @@ whose anchored paths have changed between that commit and `HEAD` (`STALE`).
 is skipped. Exit code is `0` with no drift, `1` if any anchor is stale or
 broken, `2` on a usage or repo error.
 
-<!-- code-anchor: bin/sitrep @ 695bf46 -->
+<!-- code-anchor: bin/sitrep @ 563bea4 -->
 ## `sitrep` — the cross-repo context bus
 
 ```
@@ -228,6 +234,22 @@ repo has these files, sitrep also prints from them:
 
 Any of these sections is silently omitted if the corresponding file doesn't
 exist, so a hub repo without a `STANDING.md` just won't show that section.
+
+One more section prints unconditionally, regardless of the hub repo's
+contents: **vendored contract drift**. Some repos deliberately keep a
+hand-updated copy of another repo's file — for example `sutradhara` vendors a
+copy of `remanence`'s `proto/layer5.proto`, and treats refreshing that copy as
+a considered event rather than something to automate. Nothing else signals
+how far the copy has fallen behind, so `sitrep` diffs each configured pair and
+reports the line count: `<label>: N line(s) behind <filename>`, or
+`(all vendored copies current)` if every configured pair is in sync. The
+pairs are a short list hardcoded directly in the `sitrep` script itself (one
+pair today, `remanence`/`sutradhara`) — not read from
+`~/.config/gardener/`, and not something `gardener init` sets up. A pair is
+silently skipped if either file doesn't exist, so on a machine without those
+specific repos this section just prints `(all vendored copies current)`.
+Reporting the drift is deliberate. `sitrep` never touches the copy itself;
+closing the gap stays a human decision.
 
 <!-- code-anchor: bin/devup2 @ 695bf46 -->
 ## `devup2` — thread-keyed cockpit sessions
