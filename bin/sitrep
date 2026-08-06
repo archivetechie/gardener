@@ -56,6 +56,23 @@ if [[ -f "$HUB/docs/INDEX.md" ]]; then
         | grep -oE '`[^`]*prompt[^`]*`' | sort -u | sed 's/^/  /' | head -12 || echo "  (none)"
 fi
 
+# Vendored contracts drift silently: a copy is only updated as a deliberate
+# tracking event, so nothing tells you how far behind it is until something
+# breaks. Report the distance rather than closing it — closing it is a decision.
+bold "── vendored contract drift ──"
+_drift_any=0
+while IFS='|' read -r src dst label; do
+    [[ -f "$src" && -f "$dst" ]] || continue
+    n=$(diff "$src" "$dst" 2>/dev/null | grep -c '^[<>]' || true)
+    if [[ "${n:-0}" -gt 0 ]]; then
+        echo "  $label: $n line(s) behind $(basename "$src")"
+        _drift_any=1
+    fi
+done <<'PAIRS'
+/home/swami/remanence/proto/layer5.proto|/home/swami/sutradhara/proto/layer5.proto|sutradhara vendored layer5.proto
+PAIRS
+[[ "$_drift_any" -eq 0 ]] && echo "  (all vendored copies current)"
+
 if [[ -d "$HUB/journal" ]]; then
     bold "── journal today ──"
     J="$HUB/journal/$(date +%F).md"
