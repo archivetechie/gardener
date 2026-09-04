@@ -95,7 +95,9 @@ which code the section describes and the commit at which it was verified:
 - Commit your work yourself, doc files only, added by explicit path (never
   `git add -A`):
   `auto(docs): <one-line summary of what improved> [docsmith]`
-  with trailer: `Co-Authored-By: Claude Sonnet (docsmith) <noreply@anthropic.com>`
+  Attribution rule (Swami 2026-07-19): commits in the archivetechie repos carry
+  NO AI co-author trailers (no `Co-Authored-By: Claude/GPT/...` lines) — the
+  work is multi-model and is attributed to The ArchiveTech Project only.
 - Do NOT push — gardener's push machinery handles that.
 - If the repo looks mid-surgery (half-finished refactor, failing state you can't
   interpret), do a smaller safe increment or just update the notebook and stop.
