@@ -139,7 +139,7 @@ Log: `~/.local/state/gardener/daily.log`, truncated to the last 3000 lines.
 Like `housekeep.sh`, it exports `TZ=UTC` at the top of the script, so its log
 timestamps and any commits it makes are UTC as well.
 
-<!-- code-anchor: bin/docsmith.sh templates/docsmith-prompt.md @ 695bf46 -->
+<!-- code-anchor: bin/docsmith.sh templates/docsmith-prompt.md @ 1aa5f69 -->
 ## `docsmith.sh` — the nightly documentation layer
 
 **Not wired into `gardener install`.** To enable it, add a cron line by hand,
@@ -185,6 +185,10 @@ Behavior:
   instead of failing silently.
 - Does **not** push — that stays with `housekeep.sh` so there's a single push
   path.
+- Same commit-trailer convention as the daily layer: the prompt template
+  instructs no AI co-author trailer on docsmith's own commits (no
+  `Co-Authored-By: Claude/GPT/...` line) — attributed to The ArchiveTech
+  Project only, not to whichever model ran the pass.
 
 Config keys:
 
