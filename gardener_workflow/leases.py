@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import subprocess
+import stat
+import re
 from contextlib import AbstractContextManager
 from pathlib import Path
 
@@ -26,18 +28,19 @@ def repo_resource(repo: Path) -> str:
     return "repo:" + str(Path(common).resolve())
 
 
-def inherited_descriptors() -> dict[str, int]:
+def _validate_descriptors(raw: dict) -> dict[str, int]:
     """Accept inherited descriptors only when they really lock the named inode."""
-    raw = json.loads(os.environ.get("WORKFLOW_LOCK_FDS", "{}"))
     if not isinstance(raw, dict):
         raise ValueError("invalid inherited lease map")
     result = {}
     lock_root = (state_dir() / "locks").resolve()
     for name, fd in raw.items():
         path = Path(name)
-        if path.parent.resolve() != lock_root or not isinstance(fd, int) or fd < 3:
+        if not path.is_absolute() or path.parent != lock_root or not re.fullmatch(r"[0-9a-f]{64}\.lock", path.name) or type(fd) is not int or fd < 3:
             raise ValueError("invalid inherited lease descriptor")
-        actual, expected = os.fstat(fd), path.stat()
+        actual, expected = os.fstat(fd), path.lstat()
+        if not stat.S_ISREG(expected.st_mode) or expected.st_uid != os.getuid() or expected.st_nlink != 1:
+            raise ValueError("inherited lease path is not an owned regular lock file")
         if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
             raise ValueError("inherited lease descriptor names a different file")
         try:
@@ -46,6 +49,28 @@ def inherited_descriptors() -> dict[str, int]:
             raise BusyError(f"inherited lease is not held: {name}") from exc
         result[name] = fd
     return result
+
+
+def inherited_descriptors() -> dict[str, int]:
+    """Validate inherited FDs, recovering only from the verified parent broker."""
+    raw = json.loads(os.environ.get("WORKFLOW_LOCK_FDS", "{}"))
+    try:
+        return _validate_descriptors(raw)
+    except (OSError, ValueError, BusyError):
+        from .lease_broker import BROKER_ENV, recover_descriptors
+        if BROKER_ENV not in os.environ:
+            raise
+        recovered = recover_descriptors()
+        try:
+            if set(recovered) != set(raw):
+                raise ValueError("broker resources differ from inherited resources")
+            verified = _validate_descriptors(recovered)
+        except BaseException:
+            for fd in recovered.values():
+                os.close(fd)
+            raise
+        os.environ["WORKFLOW_LOCK_FDS"] = json.dumps(verified)
+        return verified
 
 
 class Lease(AbstractContextManager):
@@ -60,11 +85,11 @@ class Lease(AbstractContextManager):
     def __enter__(self):
         root = state_dir() / "locks"
         root.mkdir(parents=True, exist_ok=True)
-        self.previous = os.environ.get("WORKFLOW_LOCK_FDS")
         self.descriptors = inherited_descriptors()
+        self.previous = os.environ.get("WORKFLOW_LOCK_FDS")
         try:
             for resource in self.resources:
-                path = (root / (hashlib.sha256(resource.encode()).hexdigest() + ".lock")).resolve()
+                path = root.resolve() / (hashlib.sha256(resource.encode()).hexdigest() + ".lock")
                 if str(path) in self.descriptors:
                     continue
                 fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -96,6 +121,9 @@ class Lease(AbstractContextManager):
 
 def run_child(command: list[str], **kwargs) -> subprocess.CompletedProcess:
     """Keep all inherited resource locks alive through a subprocess tree."""
+    descriptors = inherited_descriptors()
     if kwargs.get("env") is not None:
         kwargs["env"] = {**kwargs["env"], "WORKFLOW_LOCK_FDS": os.environ.get("WORKFLOW_LOCK_FDS", "{}")}
-    return subprocess.run(command, pass_fds=tuple(inherited_descriptors().values()), **kwargs)
+        if "WORKFLOW_LOCK_BROKER" in os.environ:
+            kwargs["env"]["WORKFLOW_LOCK_BROKER"] = os.environ["WORKFLOW_LOCK_BROKER"]
+    return subprocess.run(command, pass_fds=tuple(descriptors.values()), **kwargs)

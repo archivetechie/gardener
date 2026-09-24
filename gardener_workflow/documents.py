@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
 from .gitstate import changed_paths, git, git_text, identity, source_snapshot
@@ -150,6 +151,21 @@ EDIT_SCHEMA = {"type": "object", "additionalProperties": False,
                    "required": ["path", "content"]}}}, "required": ["summary", "edits"]}
 
 
+@contextmanager
+def available_repo(repo: Path):
+    """Treat lock contention as normal scheduling, without hiding body failures."""
+    lease = Lease([repo_resource(repo)])
+    try:
+        lease.__enter__()
+    except BusyError:
+        yield False
+        return
+    try:
+        yield True
+    finally:
+        lease.__exit__(None, None, None)
+
+
 def run_agent_job(kind: str) -> int:
     """Keep all agent writes isolated, propagating failure and preserving candidates."""
     attempt = Attempt(kind)
@@ -186,14 +202,16 @@ def run_agent_job(kind: str) -> int:
         for repo in choices:
             if not repo.path.exists():
                 continue
-            with Lease([repo_resource(repo.path)]):
+            with available_repo(repo.path) as available:
+                if not available:
+                    continue
                 baseline = identity(repo.path)
                 if baseline["dirty"]:
                     continue
                 worktree = jobs / "worktree"
                 git(repo.path, "worktree", "add", "--detach", str(worktree), baseline["head"])
                 candidate_worktree, candidate_repo = worktree, repo.path
-                snapshots = {str(r.path): source_snapshot(r.path) for r in repos if (r.path / ".git").exists()}
+                snapshots = {str(repo.path): source_snapshot(repo.path, operational_refs=False)}
                 _, drift = anchor_drift(worktree)
                 prompt = (f"You are the {kind} author. Return structured JSON proposals only. "
                           "Read source under /workspace. Do not execute commands or change files. "
@@ -204,10 +222,10 @@ def run_agent_job(kind: str) -> int:
                           f"Primary automation evidence:\n{render_health()}\nAnchor findings:\n{drift}\n")
                 if kind != "docsmith":
                     prompt += "This is a private operational summary: return no file edits; explain the supplied primary evidence.\n"
-                model = os.environ.get("DOCSMITH_MODEL" if kind == "docsmith" else "DAILY_MODEL", "claude-sonnet-5")
+                model = os.environ.get("BRIEF_MODEL", "claude-fable-5") if kind == "weekly" else os.environ.get("DOCSMITH_MODEL" if kind == "docsmith" else "DAILY_MODEL", "claude-sonnet-5")
                 code, payload = model_result(worktree, prompt, model, EDIT_SCHEMA, log)
                 for source, old in snapshots.items():
-                    if source_snapshot(Path(source)) != old:
+                    if source_snapshot(Path(source), operational_refs=False) != old:
                         raise ValueError(f"source checkout changed during agent job: {source}")
                 if code:
                     attempt.finish(code, "failed", phase="agent", log=str(log), log_sha256=digest_file(log))

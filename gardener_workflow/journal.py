@@ -8,12 +8,49 @@ from pathlib import Path
 
 from .candidates import backlog
 from .gitstate import git, git_text, source_snapshot
-from .leases import Lease, repo_resource
+from .leases import BusyError, Lease, repo_resource
 from .records import Attempt, digest_file, read_attempts, render_health, utc_now
 from .registry import registry, state_dir
 
 
-def export_journal() -> int:
+def journal_attempts(attempts: list[dict], today: str, exclude: str) -> list[dict]:
+    """Export today's records plus each job's latest and last successful evidence."""
+    selected, latest, passed = {}, {}, {}
+    for item in attempts:
+        ident = item["attempt_id"]
+        if ident == exclude:
+            continue
+        start = item.get("start", {})
+        kind = start.get("kind", "unknown")
+        latest[kind] = item
+        if item["verdict"] == "passed":
+            passed[kind] = item
+        if start.get("time", "").startswith(today):
+            selected[ident] = item
+    for item in [*latest.values(), *passed.values()]:
+        selected[item["attempt_id"]] = item
+    return list(selected.values())
+
+
+def hygiene_findings(hub: Path, repos: list) -> str:
+    """Report index and branch maintenance needs without rewriting their history."""
+    lines = ["\n## Maintenance observations", "", "Read-only observations; these do not advance verification dates."]
+    for index in sorted((hub / "docs").rglob("INDEX.md")) + sorted((hub / "journal").rglob("INDEX.md")):
+        if not index.read_text().strip():
+            lines.append(f"- EMPTY documentation registry: `{index.relative_to(hub)}`")
+    for repo in repos:
+        branch = git(repo.path, "symbolic-ref", "-q", "--short", "HEAD", check=False)
+        upstream = git(repo.path, "rev-parse", "--abbrev-ref", "@{upstream}", check=False)
+        name = branch.stdout.decode().strip() or "detached"
+        if upstream.returncode:
+            lines.append(f"- {repo.name}: {name}; upstream unknown")
+        else:
+            counts = git(repo.path, "rev-list", "--left-right", "--count", "HEAD...@{upstream}").stdout.decode().strip().split()
+            lines.append(f"- {repo.name}: {name}; ahead={counts[0]}, behind={counts[1]} relative to locally recorded upstream")
+    return "\n".join(lines) + "\n"
+
+
+def export_journal(kind: str = "daily") -> int:
     """Commit only generated private facts when the hub is clean and still matches."""
     attempt = Attempt("journal-export")
     try:
@@ -23,7 +60,7 @@ def export_journal() -> int:
             raise ValueError("an explicitly private hub is required")
         with Lease([repo_resource(hub)]):
             source = source_snapshot(hub)
-            facts = render_health(exclude={attempt.id}) + "\n## Documentation candidates\n\n" + json.dumps(backlog(), indent=2) + "\n"
+            facts = render_health(exclude={attempt.id}) + "\n## Documentation candidates\n\n" + json.dumps(backlog(), indent=2) + "\n" + hygiene_findings(hub, repos)
             pending = state_dir() / "journal-pending.md"
             pending.parent.mkdir(parents=True, exist_ok=True)
             pending.write_text(facts)
@@ -41,13 +78,13 @@ def export_journal() -> int:
                     evidence_root = worktree / "journal/automation/evidence"
                     evidence_root.mkdir(parents=True, exist_ok=True)
                     attempts, errors = read_attempts()
-                    if errors:
-                        raise ValueError("primary event validation failed: " + "; ".join(errors))
+                    # Corruption stays visible in render_health; valid jobs still export.
+                    # Invalid records cannot be promoted to passing evidence.
                     # Export actual records cited by today's summary, retaining
                     # start/source/terminal identity across local log retention.
                     # Retain all records referenced by the rendered health,
                     # including the last older attempt of an infrequent job.
-                    for item in attempts:
+                    for item in journal_attempts(attempts, utc_now()[:10], attempt.id):
                         if item["attempt_id"] == attempt.id:
                             continue
                         for event in ("start", "source", "terminal"):
@@ -76,7 +113,17 @@ def export_journal() -> int:
                                                 suffix = "" if number is None else f"-{number}"
                                                 shutil.copyfile(linked, evidence_root / f"{item['attempt_id']}{suffix}-{key}{linked.suffix}")
                     path.write_text(facts)
-                    git(worktree, "add", "--", "journal/automation/daily", "journal/automation/evidence")
+                    paths = ["journal/automation/daily", "journal/automation/evidence"]
+                    if kind == "weekly":
+                        brief = "# Weekly program brief\n\n" + facts
+                        weekly = next((a for a in reversed(attempts) if a.get("start", {}).get("kind") == "weekly" and a["verdict"] == "passed"), None)
+                        if weekly:
+                            artifact = evidence_root / f"{weekly['attempt_id']}-artifact.json"
+                            if artifact.is_file():
+                                brief += f"\nModel commentary (not independently reviewed; primary records above determine status): [{weekly['attempt_id']}]({artifact.relative_to(worktree)}).\n"
+                        (worktree / "BRIEF.md").write_text(brief)
+                        paths.append("BRIEF.md")
+                    git(worktree, "add", "--", *paths)
                     git(worktree, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "commit", "-m", "auto(journal): export primary workflow evidence", "-m", "Provenance: Gardener deterministic evidence renderer")
                     candidate = git_text(worktree, "rev-parse", "HEAD")
                     if source_snapshot(hub) != source:
@@ -86,6 +133,9 @@ def export_journal() -> int:
                     git(hub, "worktree", "remove", "--force", str(worktree), check=False)
             attempt.finish(0, "passed", phase="promotion", candidate=candidate, evidence=str(hub / relative), evidence_sha256=digest_file(hub / relative))
             return 0
+    except BusyError as exc:
+        attempt.finish(0, "skipped", phase="eligibility", reason=str(exc))
+        return 0
     except Exception as exc:
         print(f"FAILED journal export: {exc}")
         attempt.finish(1, "failed", phase="export", error=str(exc))

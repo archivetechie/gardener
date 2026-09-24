@@ -97,7 +97,7 @@ class Attempt:
         """Append a terminal record, rejecting contradictory success claims."""
         if self.finished:
             raise ValueError("attempt already has a terminal record")
-        if verdict not in {"passed", "failed", "skipped", "advisory", "candidate", "known-red"}:
+        if verdict not in {"passed", "failed", "skipped", "advisory", "candidate", "known-red", "partial"}:
             raise ValueError(f"unknown attempt verdict: {verdict}")
         if verdict == "passed" and exit_code != 0:
             raise ValueError("nonzero exit cannot pass")
@@ -148,7 +148,7 @@ def read_attempts(root: Path | None = None) -> tuple[list[dict], list[str]]:
             if event == "terminal":
                 if not all(k in value for k in ("phase", "evidence")):
                     raise ValueError("terminal lacks phase/evidence declaration")
-                if value.get("verdict") not in {"passed", "failed", "skipped", "advisory", "candidate", "known-red"}:
+                if value.get("verdict") not in {"passed", "failed", "skipped", "advisory", "candidate", "known-red", "partial"}:
                     raise ValueError("invalid verdict")
                 if not isinstance(value.get("exit_code"), int):
                     raise ValueError("missing exit code")

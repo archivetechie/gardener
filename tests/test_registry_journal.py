@@ -60,6 +60,42 @@ class RegistryJournalTests(unittest.TestCase):
         self.assertTrue((evidence / f"{attempt.id}-terminal.json").is_file())
         self.assertFalse(git_text(self.repo, "status", "--porcelain"))
 
+    def test_weekly_restores_brief_and_does_not_advance_primary_dates(self):
+        proposal = self.root / "weekly.json"
+        proposal.write_text(json.dumps({"summary": "Review this evidence", "edits": []}))
+        attempt = Attempt("weekly")
+        terminal = attempt.finish(0, "passed", phase="no-change", evidence=str(proposal), evidence_sha256=digest_file(proposal))
+        before = terminal.read_bytes()
+        self.assertEqual(export_journal("weekly"), 0)
+        brief = (self.repo / "BRIEF.md").read_text()
+        self.assertIn("Weekly program brief", brief)
+        self.assertIn("not independently reviewed", brief)
+        self.assertIn(attempt.id, brief)
+        self.assertEqual(terminal.read_bytes(), before)
+
+    def test_corrupt_record_remains_visible_without_blocking_valid_exports(self):
+        attempt = Attempt("valid-job")
+        attempt.finish(0, "passed", phase="test")
+        (attempt.start.parent / "broken.json").write_text("not-json")
+        self.assertEqual(export_journal(), 0)
+        daily = next((self.repo / "journal/automation/daily").glob("*.md"))
+        self.assertIn("EVIDENCE ERROR", daily.read_text())
+        self.assertTrue((self.repo / f"journal/automation/evidence/{attempt.id}-terminal.json").is_file())
+
+    def test_selection_is_bounded_to_referenced_records(self):
+        from gardener_workflow.journal import journal_attempts
+        attempts = [{"attempt_id": str(i), "start": {"time": "2020-01-01", "kind": "job"}, "verdict": "passed"} for i in range(100)]
+        attempts.append({"attempt_id": "failed", "start": {"time": "2020-01-02", "kind": "job"}, "verdict": "failed"})
+        self.assertEqual({a["attempt_id"] for a in journal_attempts(attempts, "2026-09-24", "export")}, {"99", "failed"})
+
+    def test_busy_agent_is_skipped_and_another_repository_can_run(self):
+        from gardener_workflow.documents import run_agent_job
+        from gardener_workflow.leases import BusyError
+        with patch("gardener_workflow.documents.Lease.__enter__", side_effect=BusyError("owned")), patch("gardener_workflow.documents.model_result") as model:
+            self.assertEqual(run_agent_job("docsmith"), 0)
+        model.assert_not_called()
+        self.assertEqual(read_attempts()[0][-1]["verdict"], "skipped")
+
     def test_bad_registry_still_has_failed_terminal(self):
         (self.root / "config/repositories.toml").write_text('repository = []\n')
         self.assertEqual(export_journal(), 1)

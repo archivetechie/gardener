@@ -63,7 +63,7 @@ def identity(repo: Path, *, runtime: bool = False) -> dict:
         paths = git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard").stdout
         source_hash = hashlib.sha256()
         for name in sorted({os.fsdecode(p) for p in paths.split(b"\0") if p}):
-            if name.endswith(".md") or name.startswith(("journal/", "reports/", "logs/", "docs/")):
+            if name.endswith(".md") or name.startswith(("journal/", "reports/", "logs/", "docs/", "metrics/")):
                 continue
             path = repo / name
             source_hash.update(os.fsencode(name) + b"\0")
@@ -76,10 +76,13 @@ def identity(repo: Path, *, runtime: bool = False) -> dict:
     return result
 
 
-def source_snapshot(repo: Path) -> dict:
+def source_snapshot(repo: Path, *, operational_refs: bool = True) -> dict:
     """Include refs and stash history in the unattended-author mutation guard."""
+    refs = git_text(repo, "for-each-ref", "--format=%(refname) %(objectname)")
+    if not operational_refs:
+        refs = "\n".join(line for line in refs.splitlines() if not line.startswith(("refs/checkpoints/", "refs/candidates/")))
     return {**identity(repo),
-            "refs": git_text(repo, "for-each-ref", "--format=%(refname) %(objectname)"),
+            "refs": refs,
             "head_ref": git(repo, "symbolic-ref", "-q", "HEAD", check=False).stdout.decode().strip(),
             "stash": git_text(repo, "stash", "list", "--format=%H")}
 

@@ -34,7 +34,13 @@ provide a periodic fallback. Anchors validate both the referenced commit and pat
 Daily and weekly jobs summarize primary evidence. A deterministic exporter writes
 versioned records to the explicitly private hub when its `main` is clean. Missing
 terminal records, skips, unknown identity, failures, and expired candidates remain
-visible; they cannot become passing verification through a prose summary.
+visible; they cannot become passing verification through a prose summary. Weekly
+exports update `BRIEF.md` and link the model commentary separately from primary
+status. `BRIEF_MODEL` retains its strategic-model setting; daily jobs use
+`DAILY_MODEL`. Index/branch maintenance is reported for review; automatic archival
+and remote branch deletion are intentionally removed. Each export retains today’s
+records, the latest attempt and last pass per job, plus evidence used for issue
+closure. Corrupt evidence remains an explicit error without blocking valid exports.
 
 ## Install and use
 
@@ -58,7 +64,13 @@ individual commands.
 implementation, and scenario verification. `sitrep` shares context across
 repositories, `devup2` manages thread-specific cockpits, and `codex-exec` dispatches
 implementers under shared repository ownership. Commands outside that ownership
-protocol remain outside its exclusion guarantee.
+protocol remain outside its exclusion guarantee. A Linux descriptor broker verifies
+peer credentials and process ancestry before handing held locks to descendant tool
+processes. Ordinary children receive descriptors directly. The installed Codex
+workspace sandbox blocks broker socket connections: nested workflow commands in
+`--write` mode fail closed. Run those commands after that agent exits, or use an
+explicitly authorized `--full` implementation session; the wrapper never silently
+broadens the sandbox. Independent read-only reviewers do not acquire write leases.
 
 Public repositories contain distilled product documentation. Designs, prompts,
 reviews, issue ledgers, and journals belong in the private hub. `gardener init`

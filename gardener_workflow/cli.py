@@ -11,6 +11,7 @@ from .checkpoint import checkpoint
 from .documents import anchor_drift, run_agent_job
 from .gitstate import git, identity
 from .leases import BusyError, Lease, repo_resource, run_child
+from .lease_broker import DescriptorBroker
 from .records import Attempt, digest_file, render_health
 from .registry import Repository, registry, state_dir, write_registry, config_dir
 from .standing import render_active
@@ -150,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
             code = run_agent_job(args.command)
             if args.command in {"daily", "weekly"} and code == 0:
                 from .journal import export_journal
-                return export_journal()
+                return export_journal(args.command)
             return code
         if args.command == "journal":
             from .journal import export_journal
@@ -173,8 +174,9 @@ def main(argv: list[str] | None = None) -> int:
             child = args.child[1:] if args.child[:1] == ["--"] else args.child
             if not child:
                 parser.error("lease requires a child command after --")
-            with Lease(args.resource + [repo_resource(Path(p)) for p in args.repo]):
-                return run_child(child).returncode
+            with Lease(args.resource + [repo_resource(Path(p)) for p in args.repo]) as owned:
+                with DescriptorBroker(owned.descriptors):
+                    return run_child(child).returncode
     except BusyError as exc:
         print(f"BUSY: {exc}")
         return 75
