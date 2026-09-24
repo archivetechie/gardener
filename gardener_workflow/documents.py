@@ -7,6 +7,7 @@ The parent applies structured proposals and owns Git, policy checks, and evidenc
 
 from __future__ import annotations
 
+import datetime as dt
 import fnmatch
 import json
 import os
@@ -18,7 +19,7 @@ from pathlib import Path, PurePosixPath
 
 from .gitstate import changed_paths, git, git_text, identity, source_snapshot
 from .leases import BusyError, Lease, repo_resource
-from .records import Attempt, digest_file, render_health
+from .records import Attempt, digest_file, render_health, utc_now
 from .registry import Repository, registry, state_dir
 
 
@@ -111,7 +112,7 @@ def model_result(worktree: Path, prompt: str, model: str, schema: dict, log: Pat
                    "--symlink", "usr/bin", "/bin", "--symlink", "usr/lib", "/lib",
                    "--symlink", "usr/lib64", "/lib64", "--proc", "/proc", "--dev", "/dev",
                    "--tmpfs", "/tmp", "--dir", str(Path.home()),
-                   "--bind", str(worktree), "/workspace", "--bind", str(scratch), "/state",
+                   "--ro-bind", str(worktree), "/workspace", "--bind", str(scratch), "/state",
                    "--ro-bind", str(Path(binary).resolve()), "/agent",
                    "--chdir", "/workspace", "--setenv", "CLAUDE_CONFIG_DIR", "/state/claude"]
         resolver = Path("/etc/resolv.conf").resolve()
@@ -155,11 +156,11 @@ def run_agent_job(kind: str) -> int:
     state = state_dir()
     directory = state / "docsmith" if kind == "docsmith" else state
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    log = directory / ("docsmith.log" if kind == "docsmith" else f"{kind}.log")
-    log.touch(mode=0o600, exist_ok=True)
-    log.chmod(0o600)
+    compat_log = directory / ("docsmith.log" if kind == "docsmith" else f"{kind}.log")
     jobs = state / "candidates" / attempt.id
     jobs.mkdir(parents=True, mode=0o700)
+    log = jobs / "author.log"
+    log.touch(mode=0o600)
     candidate_worktree = None
     candidate_repo = None
     try:
@@ -172,6 +173,16 @@ def run_agent_job(kind: str) -> int:
         names = [str(r.path) for r in choices]
         start = (names.index(previous) + 1) % len(choices) if previous in names else 0
         choices = choices[start:] + choices[:start]
+        audits_path = directory / "audits.json"
+        audits = json.loads(audits_path.read_text()) if audits_path.exists() else {}
+        if kind == "docsmith":
+            # Prefer changed runtime inputs, then oldest periodic audit. Rotation
+            # order remains the stable tie breaker for new repositories.
+            def priority(repo):
+                previous = audits.get(repo.name, {})
+                current = identity(repo.path, runtime=True)["runtime_digest"] if repo.path.exists() else None
+                return (previous.get("runtime_digest") == current, previous.get("time", ""))
+            choices.sort(key=priority)
         for repo in choices:
             if not repo.path.exists():
                 continue
@@ -233,15 +244,31 @@ def run_agent_job(kind: str) -> int:
                     git(worktree, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "commit",
                         "-m", "auto(docs): isolated documentation candidate", "-m", "Provenance: Gardener documentation author")
                     candidate = git_text(worktree, "rev-parse", "HEAD")
-                    git(repo.path, "update-ref", f"refs/candidates/{kind}/{attempt.id}", candidate)
+                    git(repo.path, "update-ref", f"refs/candidates/{kind}/{attempt.id}", candidate, "0" * 40)
                 (jobs / "proposal.json").write_text(json.dumps(payload, indent=2) + "\n")
-                (jobs / "candidate.json").write_text(json.dumps({"repository": repo.name, "path": str(repo.path),
-                    "base": baseline, "candidate": candidate, "kind": kind, "review": "pending" if candidate else "not-required"}, indent=2) + "\n")
+                metadata = {"candidate_id": attempt.id, "repository": repo.name, "path": str(repo.path), "base": baseline,
+                            "candidate": candidate, "kind": kind, "author": model,
+                            "expires_at": (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=7)).isoformat(),
+                            "review": {"status": "pending" if candidate else "not-required"}}
+                (jobs / "candidate.json").write_text(json.dumps(metadata, indent=2) + "\n")
+                if candidate:
+                    from .candidates import review_candidate
+                    try:
+                        metadata["review"] = review_candidate(repo, worktree, metadata, jobs)
+                    except Exception as exc:
+                        metadata["review"] = {"status": "blocked", "reason": str(exc)}
+                        (jobs / "candidate.json").write_text(json.dumps(metadata, indent=2) + "\n")
+                        raise
+                (jobs / "candidate.json").write_text(json.dumps(metadata, indent=2) + "\n")
                 git(repo.path, "worktree", "remove", str(worktree))
                 candidate_worktree = None
                 cursor.write_text(str(repo.path))
+                audits[repo.name] = {"time": utc_now(), "runtime_digest": identity(repo.path, runtime=True)["runtime_digest"], "attempt_id": attempt.id}
+                audits_path.write_text(json.dumps(audits, indent=2) + "\n")
                 attempt.finish(0, "candidate" if candidate else "passed", phase="candidate" if candidate else "no-change",
-                               candidate=candidate, source=baseline, log=str(log), log_sha256=digest_file(log))
+                               candidate=candidate, review=metadata["review"], source=baseline, log=str(log), log_sha256=digest_file(log),
+                               evidence=metadata["review"].get("evidence", str(jobs / "proposal.json")),
+                               evidence_sha256=metadata["review"].get("evidence_sha256", digest_file(jobs / "proposal.json")))
                 return 0
         attempt.finish(0, "skipped", phase="eligibility", reason="all repositories are busy, dirty, or absent")
         log.write_text("skipped: no eligible clean repository\n")
@@ -253,6 +280,10 @@ def run_agent_job(kind: str) -> int:
             attempt.finish(1, "failed", phase="candidate-guard", error=str(exc), log=str(log), log_sha256=digest_file(log))
         return 1
     finally:
+        if log.exists():
+            with compat_log.open("a") as stream:
+                stream.write(f"\nAttempt {attempt.id}\n" + log.read_text())
+            compat_log.chmod(0o600)
         if candidate_worktree is not None:
             # Rejected content is disposable; the captured log and proposal remain.
             git(candidate_repo, "worktree", "remove", "--force", str(candidate_worktree), check=False)

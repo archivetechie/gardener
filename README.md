@@ -1,180 +1,66 @@
-# gardener 🌱
+# Gardener
 
-Background repo hygiene for people who'd rather be building.
+Gardener records local recovery checkpoints, audits documentation in isolated
+worktrees, and renders workflow health from primary attempt records. The normal
+entry points remain in `bin/`; their shared implementation is `gardener_workflow/`.
 
-You brainstorm and design with an AI assistant; an implementation agent writes the
-code; **gardener quietly handles everything else** — committing, pushing, pruning
-branches, archiving finished docs — so you never have to remember to.
+## Recovery
 
-Born from a real workflow: one human + Claude (design/review) + Codex
-(implementation) across half a dozen repos, with the human deliberately hopping
-between threads. The hygiene debt that pattern generates is exactly what gardener
-automates.
+`gardener run` snapshots changed trees using a temporary index and separate
+`refs/checkpoints/` references. It preserves the active branch, index, and working
+files, including deletions. Identical trees are deduplicated; the newest 50 local
+checkpoint refs are retained. These are recovery snapshots, not reviewed commits.
 
-New to gardener? **[GETTING-STARTED.md](GETTING-STARTED.md)** is the full
-walkthrough — what it is, install, the config files, how to verify it's
-running, and how each layer (including the nightly docs layer, which has no
-install flag yet) gets turned on. This README stays the quick version.
+No default branch is pushed and no remote branch is deleted. Backups are disabled
+unless a repository explicitly names an absolute local bare repository as its
+checkpoint destination. Until then, recovery is local to this machine.
 
-## Beyond hygiene: the full working method
+## Documentation and evidence
 
-Gardener grew into the home of the whole way of working — see
-**[WORKING-METHOD.md](WORKING-METHOD.md)** (the loop: design → panel review →
-contract-referenced prompts → implementation → diff gate → scenario verify; plus
-thread-keyed cockpit sessions, the cross-session context bus, and model-economy
-routing). New tools in `bin/`:
+Docsmith proposes edits in a disposable worktree. The parent validates the whole
+candidate against configured documentation roots and protected paths. A separate
+Opus 5.5 session reviews the exact commit; only an approved candidate whose base
+still matches a clean active `main` can be fast-forwarded locally. Protected
+specifications, instructions, private working records, and non-document changes
+block promotion. Failed reviews remain visible in the candidate backlog and
+expire after seven days.
 
-- **`sitrep`** — cross-repo situation report: the context bus any agent session
-  runs at start (commits everywhere, standing issues, pending prompts).
-- **`devup2`** — thread-keyed tmux cockpits (Claude + codex windows per thread),
-  replacing one-session-per-repo sprawl.
-- **`codex-exec`** — reliable non-interactive codex dispatch (sandboxed,
-  stdin-guarded, prompt-from-file).
+The model runs through Bubblewrap with read-only tools and a separate disposable
+authentication directory. Git/SSH credentials and the source checkout are absent.
+Failure to establish the sandbox fails the job; there is no unrestricted fallback.
+Changed runtime inputs receive priority in the documentation queue; older audits
+provide a periodic fallback. Anchors validate both the referenced commit and path.
 
-Full flags, config keys, and gotchas for every tool (including how to enable
-the nightly docs layer, which has no `gardener install` switch of its own) are
-in **[TOOLS.md](TOOLS.md)**.
+Daily and weekly jobs summarize primary evidence. A deterministic exporter writes
+versioned records to the explicitly private hub when its `main` is clean. Missing
+terminal records, skips, unknown identity, failures, and expired candidates remain
+visible; they cannot become passing verification through a prose summary.
 
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
-## What it does
+## Install and use
 
-**Every 2 hours (mechanical, plain bash — `housekeep.sh`):**
-- Auto-commits repos that are dirty *and idle* (no change in the last 30 min — so
-  it never snapshots you or an agent mid-edit) as `auto(checkpoint): …`
-- Pushes (plain push, **never force**; diverged pushes are logged and left alone)
-- Prunes branches **fully merged** into the default branch (never the default
-  branch, never branches checked out in a worktree)
-
-**Once a day (judgment, optional — `daily.sh`, needs the [Claude Code](https://claude.com/claude-code) CLI):**
-- Maintains `docs/INDEX.md` in repos that have one; archives docs whose purpose is
-  complete (e.g. implementation prompts whose acceptance criteria are now met)
-- Repairs failed pushes when a fast-forward fixes them (never rebases/merges on
-  its own)
-- Reports stale unmerged branches and status-tracking drift, appends a one-section
-  summary to the repo's `journal/` if it has one
-
-**Once a night (documentation, optional — `docsmith.sh`, needs the Claude Code CLI):**
-- Visits ONE repository per night (round-robin over `docsmith-repos`) and runs a
-  headless agent whose only job is documentation excellence: motivation-first
-  READMEs, install/quickstart/API guides, plain language, everything **derived
-  from the code, never from other docs**
-- Binds prose to code with **anchor comments**
-  (`<!-- code-anchor: src/foo.rs @ <commit> -->`); the `docsmith-drift` tool
-  reports every section whose anchored code changed since it was written, and
-  stale sections are regenerated first on the next visit — high-level docs get
-  the "javadoc property": code moves, docs follow
-- Keeps a per-repo backlog notebook in `~/.local/state/gardener/docsmith/` so
-  each night is one bounded increment; commits doc files only (`auto(docs): …`),
-  a post-run guard flags any non-doc change loudly; pushing stays with housekeep
-
-Logs live in `~/.local/state/gardener/`. Config in `~/.config/gardener/`.
-
-<!-- code-anchor: bin/gardener @ 780381c -->
-## Install
-
-```bash
-git clone https://github.com/swamikevala/gardener ~/gardener
-export PATH="$HOME/gardener/bin:$PATH"     # add to your shell rc
-
-gardener add ~/my-project                  # manage an existing repo
-gardener install                           # cron: housekeep every 2h
-gardener install --daily                   # + the daily AI layer at 02:30
+```sh
+export PATH="$PWD/bin:$PATH"
+gardener add /path/to/project
+gardener install --daily
+gardener status
+workflow health
+workflow candidates
 ```
 
-That's it. `gardener status` shows what's managed and each repo's dirty/ahead state;
-`gardener log` tails what it's been doing; `gardener run` forces a pass now.
+Python 3.11+, Git, and `flock` support are required. Model jobs also require the
+Claude CLI and Bubblewrap. See [Getting started](GETTING-STARTED.md) for registry,
+scheduling, migration, recovery, and verification; [Tools](TOOLS.md) documents
+individual commands.
 
-<!-- code-anchor: bin/gardener templates/CLAUDE.md templates/AGENTS.md templates/docs-INDEX.md @ 780381c -->
-## Adopt the full workflow in a repo
+## Working together
 
-```bash
-gardener init ~/my-project
-```
+[The working method](WORKING-METHOD.md) describes design, independent review,
+implementation, and scenario verification. `sitrep` shares context across
+repositories, `devup2` manages thread-specific cockpits, and `codex-exec` dispatches
+implementers under shared repository ownership. Commands outside that ownership
+protocol remain outside its exclusion guarantee.
 
-seeds three small files (skipping any that exist):
-
-- **`CLAUDE.md`** — the repo model + conventions, read by Claude at session start.
-  Encodes the working pattern: *brainstorm → design doc → implementation prompt in
-  `docs/` → agent implements → verification gates it.* And the crucial line:
-  hygiene is automated, never ask the owner to commit.
-- **`AGENTS.md`** — the implementer's contract (read by codex & co.): run what you
-  changed and paste the output, always commit, never leave the tree dirty, update
-  the docs index.
-- **`docs/INDEX.md` + `docs/historical/`** — the docs lifecycle: every doc has a
-  status; finished prompts and superseded designs move to `docs/historical/`,
-  entirely separate from current docs — kept, never deleted.
-
-Fill the `{{...}}` blanks, commit, done.
-
-<!-- code-anchor: none -->
-## The working pattern (the part worth stealing)
-
-1. **Human + Claude brainstorm** until the design is real. The design lands as a
-   doc in `docs/`.
-2. The design becomes an **implementation prompt** (also in `docs/` — reviewable,
-   versioned, re-runnable). If the work spans repos, write **one prompt per repo**
-   with an *identical "Shared contract" section* in each — two implementation
-   agents can then build both sides with zero live coordination.
-3. **An implementation agent (codex, or Claude itself) executes the prompt**,
-   bound by `AGENTS.md`: prove it ran, commit, update the index.
-4. **Verification is a command, not a vibe** — every repo declares its one
-   "this-means-done" command in `CLAUDE.md` (a test suite, an end-to-end scenario
-   runner, whatever fits).
-5. **gardener sweeps up behind everyone.**
-
-The human's only jobs: have ideas, make decisions, and hop between threads at will.
-
-<!-- code-anchor: bin/housekeep.sh @ 563bea4 -->
-## Safety properties (the invariants — don't weaken them)
-
-| Concern | Guarantee |
-|---|---|
-| Snapshotting half-done work | Idle-aware: skips repos changed in the last 30 min |
-| Clobbering history | Plain `git push` only — never force, never rebase/merge automatically |
-| Losing branches | Prunes only branches *fully merged* into the default branch; worktree-checked-out branches are protected |
-| Mid-operation repos | Skips repos with a merge/rebase in progress or detached HEAD |
-| Runaway logs | Logs are bounded (tail-rotated) |
-
-Auto-commits are clearly tagged (`auto(checkpoint)`, `auto(daily)`) so history
-stays interpretable.
-
-<!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/docsmith.sh @ 563bea4 -->
-## Configuration
-
-`~/.config/gardener/repos` — one absolute path per line (`#` comments fine).
-
-`~/.config/gardener/config` (optional, sourced as shell):
-```bash
-IDLE_MIN=30                    # quiet minutes before auto-commit
-DAILY_MODEL=claude-sonnet-4-6  # model for the daily layer
-DAILY_MAX_TURNS=40
-DOCSMITH_MODEL=claude-sonnet-5 # model for the nightly docs layer
-DOCSMITH_MAX_TURNS=80
-AUTHOR_TRAILER="Co-Authored-By: ..."   # trailer for auto commits
-```
-
-`~/.config/gardener/docsmith-repos` — the docs layer's rotation list (defaults to
-the managed repos file if absent). May include local-only repos: docsmith just
-commits; pushing happens wherever a remote exists.
-
-## Uninstall
-
-```bash
-crontab -l | grep -v gardener | crontab -    # remove the cron entries
-rm -rf ~/.config/gardener ~/.local/state/gardener ~/gardener
-```
-
-Your repos are untouched — gardener only ever made ordinary git commits.
-
-## FAQ
-
-**Won't auto-committing WIP make my history messy?** Slightly — and that's the
-trade. A checkpointed mess beats lost work and "what was I doing?" archaeology.
-The commits are tagged and the daily layer keeps the *docs* tidy, which is where
-tidiness actually pays.
-
-**What if I use PRs, not direct-to-main?** gardener pushes whatever branch a repo
-is on and never merges. Work on feature branches as usual; it just checkpoints them.
-
-**Does it need codex?** No. The pattern works with any implementer — codex, Claude,
-or you. Only the optional daily layer needs the `claude` CLI.
+Public repositories contain distilled product documentation. Designs, prompts,
+reviews, issue ledgers, and journals belong in the private hub. `gardener init`
+seeds instruction files only when absent; set `GARDENER_PRIVATE_REPO=1` to also
+seed a private documentation index. Existing files are preserved.

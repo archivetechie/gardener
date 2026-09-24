@@ -20,7 +20,7 @@ PROMPT_FILE="${1:?usage: codex-exec <prompt-file> [--cd dir] [--write] [--timeou
 shift
 CD_DIR="$HOME"
 SANDBOX="read-only"
-TIMEOUT=600
+TIMEOUT=86400
 MODEL=""
 
 while (($#)); do
@@ -60,14 +60,20 @@ if [[ "${CODEX_EXEC_NOLOCK:-0}" != "1" ]] && command -v flock >/dev/null 2>&1; t
         if flock -w 90000 9; then
             echo "codex-exec: lease acquired, dispatching." >&2
         else
-            echo "codex-exec: WARN lease wait exceeded 25h; proceeding unserialized." >&2
+            echo "codex-exec: lease acquisition failed." >&2
+            exit 75
         fi
     else
-        echo "codex-exec: WARN cannot open lease $CODEX_EXEC_LOCK; running unserialized." >&2
+        echo "codex-exec: cannot open lease $CODEX_EXEC_LOCK." >&2
+        exit 75
     fi
 fi
 
-exec timeout "$TIMEOUT" codex exec \
+WORKFLOW_ARGS=()
+if [[ "$SANDBOX" != "read-only" ]]; then
+    WORKFLOW_ARGS=("$(dirname "$(readlink -f "$0")")/workflow" lease --repo "$CD_DIR" --)
+fi
+exec "${WORKFLOW_ARGS[@]}" timeout "$TIMEOUT" codex exec \
     --sandbox "$SANDBOX" \
     --skip-git-repo-check \
     --cd "$CD_DIR" \

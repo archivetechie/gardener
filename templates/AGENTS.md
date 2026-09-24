@@ -13,6 +13,8 @@
    add any docs you created.
 4. Don't touch `docs/historical/` or any generated files the project regenerates.
 
-## Background automation you should know about
-A `gardener` cron may auto-commit idle changes (`auto(checkpoint)` messages).
-Do your own commits promptly so the checkpointer never snapshots half-done state.
+## Background automation
+
+Gardener checkpoints use separate refs and a temporary index. Cooperating writers
+share repository leases. Run `sitrep` at session start and commit reviewed work
+promptly. A recovery snapshot or journal summary is not verification evidence.

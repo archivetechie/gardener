@@ -25,6 +25,8 @@ def read_standing(path: Path) -> list[dict]:
             continue
         if len(cells) < len(header):
             raise ValueError(f"malformed standing row in {path}: {line}")
+        if len(cells) > len(header):
+            cells = cells[:len(header) - 1] + ["|".join(cells[len(header) - 1:])]
         row = dict(zip(header, cells))
         row["state"] = re.sub(r"[*_`]", "", row["state"]).strip().lower()
         title = row.get("issue", row.get("id", ""))
@@ -43,4 +45,3 @@ def render_active(path: Path) -> str:
         lines.append(f"  [{row['state']}] {date} {row['id']}: {row.get('issue', '')}")
     lines.append(f"  ({len(rows)} active issues; none omitted)")
     return "\n".join(lines)
-

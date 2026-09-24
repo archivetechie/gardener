@@ -12,10 +12,10 @@ touch "$REPOS_FILE"
 
 usage() {
     cat <<EOF
-gardener — background repo hygiene (auto-checkpoint, push, prune) + daily AI tidy-up
+gardener — isolated recovery checkpoints + evidence-based documentation candidates
 
 usage:
-  gardener add <path>        manage a repo (adds to $REPOS_FILE)
+  gardener add <path>        manage a repo (repositories.toml)
   gardener remove <path>     stop managing a repo
   gardener list              show managed repos
   gardener init <path>       seed a repo with the workflow convention files
@@ -32,19 +32,8 @@ abspath() { cd "$1" 2>/dev/null && pwd; }
 
 cmd="${1:-}"; shift || true
 case "$cmd" in
-    add)
-        p=$(abspath "${1:?path required}") || { echo "no such dir: $1" >&2; exit 1; }
-        [[ -d "$p/.git" ]] || { echo "not a git repo: $p" >&2; exit 1; }
-        grep -qxF "$p" "$REPOS_FILE" || echo "$p" >>"$REPOS_FILE"
-        echo "✓ managing $p"
-        ;;
-    remove)
-        p=$(abspath "${1:?path required}") || p="$1"
-        grep -vxF "$p" "$REPOS_FILE" >"$REPOS_FILE.tmp" && mv "$REPOS_FILE.tmp" "$REPOS_FILE"
-        echo "✓ no longer managing $p"
-        ;;
-    list)
-        cat "$REPOS_FILE"
+    add|remove|list)
+        exec "$GARDENER_HOME/bin/workflow" registry "$cmd" "$@"
         ;;
     init)
         p=$(abspath "${1:?path required}") || { echo "no such dir: $1" >&2; exit 1; }
@@ -58,12 +47,19 @@ case "$cmd" in
                 echo "✓ seeded $t"
             fi
         done
+        # Private working records belong in the configured hub.
+        if [[ "${GARDENER_PRIVATE_REPO:-0}" == "1" ]]; then
         mkdir -p "$p/docs/historical"
         if [[ ! -e "$p/docs/INDEX.md" ]]; then
             sed "s|{{REPO_NAME}}|$name|g" "$GARDENER_HOME/templates/docs-INDEX.md" >"$p/docs/INDEX.md"
             echo "✓ seeded docs/INDEX.md (+ docs/historical/)"
         fi
-        "$0" add "$p"
+        fi
+        if [[ "${GARDENER_PRIVATE_REPO:-0}" == "1" ]]; then
+            "$0" add "$p" --private
+        else
+            "$0" add "$p"
+        fi
         echo "→ review the seeded files, fill the {{...}} blanks, then commit."
         ;;
     install)
@@ -80,15 +76,7 @@ case "$cmd" in
     daily)   exec "$GARDENER_HOME/bin/daily.sh" ;;
     log)     exec tail -n "${1:-40}" "$STATE_DIR/housekeep.log" ;;
     status)
-        echo "config: $REPOS_FILE"; echo "cron:"; crontab -l 2>/dev/null | grep -E "gardener" | sed 's/^/  /' || echo "  (not installed)"
-        echo "repos:"
-        grep -vE '^\s*(#|$)' "$REPOS_FILE" | while IFS= read -r r; do
-            r="${r/#\~/$HOME}"
-            [[ -d "$r/.git" ]] || { echo "  $r  MISSING"; continue; }
-            d=$(git -C "$r" status --porcelain | wc -l)
-            a=$(git -C "$r" rev-list --count '@{u}..HEAD' 2>/dev/null || echo '?')
-            printf "  %-40s dirty:%-4s ahead:%s\n" "$r" "$d" "$a"
-        done
+        exec "$GARDENER_HOME/bin/workflow" sitrep
         ;;
     ""|help|-h|--help) usage ;;
     *) echo "unknown command: $cmd" >&2; usage >&2; exit 1 ;;

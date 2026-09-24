@@ -11,18 +11,19 @@ where the entry points are.}}
 ## The working pattern (do not fight it)
 The owner brainstorms with Claude → design lands as a doc in `docs/` → an
 **implementation prompt** is written to `docs/` (when work spans repos, write one
-prompt per repo with an identical "Shared contract" section so the implementers
+prompt per repo referencing the same normative contract file so the implementers
 need no live coordination) → an implementation agent (e.g. codex) executes it →
 verification gates the result. Claude designs and reviews; the implementer builds.
 The owner hops between threads by design — keep thread state in tasks/notes so
 hops are cheap.
 
-## Hygiene is automated — never ask the owner to do it
-- `gardener` auto-commits idle changes (`auto(checkpoint): …`), pushes, and prunes
-  merged branches in the background. Auto commits in history are normal.
-- A daily AI pass maintains `docs/INDEX.md` and archives completed docs.
-- Direct-to-main unless stated otherwise. Commit at every green milestone; don't
-  accumulate WIP.
+## Hygiene is automated
+
+Gardener creates recovery refs without changing the active branch or index.
+Documentation runs in isolated candidates and needs independent review before
+local integration. Use `sitrep` and primary attempt evidence for current status.
+Public documentation belongs here; designs, prompts, reviews and operational
+journals belong in the configured private hub. Commit reviewed work promptly.
 
 ## Docs lifecycle
 `docs/INDEX.md` is the registry: every doc is `current | implemented | superseded |

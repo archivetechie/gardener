@@ -185,9 +185,10 @@ def source_known(source: object) -> bool:
         for value in source.values()))
 
 
-def render_health(root: Path | None = None) -> str:
+def render_health(root: Path | None = None, *, exclude: set[str] | None = None) -> str:
     """Render status only from primary attempt records, retaining failure links."""
     attempts, problems = read_attempts(root)
+    attempts = [a for a in attempts if a["attempt_id"] not in (exclude or set())]
     lines = ["## Automation evidence", ""]
     if not attempts:
         lines.append("No attempt evidence recorded; verification state is unknown.")

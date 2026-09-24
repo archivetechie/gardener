@@ -7,6 +7,8 @@ owns repository identity, documentation policy, and the private evidence root.
 from __future__ import annotations
 
 import os
+import tempfile
+import json
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +25,7 @@ def state_dir() -> Path:
 
 
 PROTECTED = (
-    "AGENTS.md", "CLAUDE.md", ".github/**", ".git*", "specs/**",
+    "AGENTS.md", "CLAUDE.md", "docs/INDEX.md", "**/INDEX.md", ".github/**", ".git*", "specs/**",
     "docs/contract-*", "docs/design-*", "docs/prompt-*", "docs/process-*",
     "docs/archive/**", "docs/historical/**", "journal/**", "STANDING.md",
     "GAPBOARD.md", "COVERAGE.md", "BRIEF.md",
@@ -103,8 +105,43 @@ def records_dir() -> Path:
     if os.environ.get("GARDENER_RECORDS_DIR"):
         return Path(os.environ["GARDENER_RECORDS_DIR"]).expanduser()
     try:
-        hub, _ = registry()
+        hub, repos = registry()
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         # Configuration failure must itself remain observable as an attempt.
         return state_dir() / "events"
-    return hub / "journal/automation/events" if hub else state_dir() / "events"
+    private = hub and any(r.path == hub and not r.public for r in repos)
+    return hub / "journal/automation/events" if private else state_dir() / "events"
+
+
+def write_registry(hub: Path | None, repos: list[Repository]) -> Path:
+    """Atomically persist explicit policy; legacy path lists become read-only inputs."""
+    lines = ["# Managed by gardener; checkpoint backup is opt-in."]
+    if hub:
+        lines.append("hub = " + json.dumps(str(hub)))
+    for repo in repos:
+        lines.extend(["", "[repository." + json.dumps(repo.name) + "]",
+                      "path = " + json.dumps(str(repo.path)),
+                      "public = " + str(repo.public).lower(),
+                      "docsmith = " + str(repo.docsmith).lower(),
+                      "docs = " + json.dumps(repo.docs),
+                      "protected = " + json.dumps(repo.protected)])
+        if repo.checkpoint_remote:
+            lines.append("checkpoint_remote = " + json.dumps(repo.checkpoint_remote))
+    path = config_dir() / "repositories.toml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix=".registry-", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w") as stream:
+            stream.write("\n".join(lines) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+        descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path

@@ -70,22 +70,15 @@ itself, not config; sitrep only reports the distance, never closes it — see
 [TOOLS.md](TOOLS.md) for the full mechanism.
 
 <!-- code-anchor: bin/housekeep.sh bin/daily.sh bin/gardener @ 563bea4 -->
-## Hygiene (the original gardener core)
+## Hygiene
 
-- `housekeep.sh` every 2h: idle-aware auto-commit, push (never force), prune
-  merged branches. Agents commit at every green milestone; the checkpointer is
-  the backstop, not the habit.
-- `daily.sh` once a day (LLM judgment, cheap model): docs INDEX/`docs/historical/`
-  maintenance, push repair, regression call-outs, STANDING.md upkeep, journal.
-- Weekly brief (top-tier model, bounded turns): state-of-program, ranked next
-  moves, the business-decision queue — the one scheduled top-tier spend. **Not
-  part of this repo** — there's no `bin/weekly-brief.sh` here and no
-  `gardener install` flag for it. It's a standalone script per hub repo, wired
-  in with its own manual crontab line, the same pattern as docsmith's own
-  hand-added cron line (see
-  [GETTING-STARTED.md](GETTING-STARTED.md#the-weekly-brief-is-not-part-of-this-repo)).
+Housekeeping creates separate recovery refs without changing the active branch
+or index. Daily and weekly summaries derive claims from primary attempt records.
+Docsmith authors in a sandboxed worktree; independent exact-candidate review and
+whole-output guards precede local integration. No scheduled job publishes the
+active branch or deletes remote branches. See [Getting started](GETTING-STARTED.md)
+for ownership, evidence, registry, and recovery details.
 
-<!-- code-anchor: bin/codex-exec @ fda5814 -->
 ## Dispatching codex reliably (`bin/codex-exec`)
 
 Non-interactive codex from scripts/cockpits: prompt from a file, stdin guarded
