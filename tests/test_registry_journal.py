@@ -73,6 +73,19 @@ class RegistryJournalTests(unittest.TestCase):
         self.assertIn(attempt.id, brief)
         self.assertEqual(terminal.read_bytes(), before)
 
+    def test_cli_exports_failed_weekly_attempt_and_preserves_nonzero_exit(self):
+        from gardener_workflow.cli import main
+
+        with patch("gardener_workflow.documents.model_result", return_value=(7, None)):
+            self.assertEqual(main(["weekly"]), 7)
+        attempts, errors = read_attempts()
+        self.assertFalse(errors)
+        weekly = next(a for a in reversed(attempts) if a["start"]["kind"] == "weekly")
+        self.assertEqual(weekly["verdict"], "failed")
+        brief = (self.repo / "BRIEF.md").read_text()
+        self.assertIn(f"attempt `{weekly['attempt_id']}` is failed", brief)
+        self.assertNotIn("Model commentary (not independently reviewed", brief)
+
     def test_corrupt_record_remains_visible_without_blocking_valid_exports(self):
         attempt = Attempt("valid-job")
         attempt.finish(0, "passed", phase="test")

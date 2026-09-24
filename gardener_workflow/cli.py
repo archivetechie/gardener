@@ -149,9 +149,10 @@ def main(argv: list[str] | None = None) -> int:
             return housekeep()
         if args.command in {"daily", "docsmith", "weekly"}:
             code = run_agent_job(args.command)
-            if args.command in {"daily", "weekly"} and code == 0:
+            if args.command in {"daily", "weekly"}:
                 from .journal import export_journal
-                return export_journal(args.command)
+                exported = export_journal(args.command)
+                return code or exported
             return code
         if args.command == "journal":
             from .journal import export_journal

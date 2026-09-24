@@ -116,8 +116,10 @@ def export_journal(kind: str = "daily") -> int:
                     paths = ["journal/automation/daily", "journal/automation/evidence"]
                     if kind == "weekly":
                         brief = "# Weekly program brief\n\n" + facts
-                        weekly = next((a for a in reversed(attempts) if a.get("start", {}).get("kind") == "weekly" and a["verdict"] == "passed"), None)
-                        if weekly:
+                        weekly = next((a for a in reversed(attempts) if a.get("start", {}).get("kind") == "weekly" ), None)
+                        if weekly and weekly["verdict"] != "passed":
+                            brief += f"\nModel commentary unavailable: attempt `{weekly['attempt_id']}` is {weekly['verdict']}.\n"
+                        elif weekly:
                             artifact = evidence_root / f"{weekly['attempt_id']}-artifact.json"
                             if artifact.is_file():
                                 brief += f"\nModel commentary (not independently reviewed; primary records above determine status): [{weekly['attempt_id']}]({artifact.relative_to(worktree)}).\n"

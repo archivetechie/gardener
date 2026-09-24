@@ -36,7 +36,8 @@ versioned records to the explicitly private hub when its `main` is clean. Missin
 terminal records, skips, unknown identity, failures, and expired candidates remain
 visible; they cannot become passing verification through a prose summary. Weekly
 exports update `BRIEF.md` and link the model commentary separately from primary
-status. `BRIEF_MODEL` retains its strategic-model setting; daily jobs use
+status. Facts export even when the model job fails, preserving its failure status.
+`BRIEF_MODEL` defaults to `opus`; daily jobs use
 `DAILY_MODEL`. Index/branch maintenance is reported for review; automatic archival
 and remote branch deletion are intentionally removed. Each export retains today’s
 records, the latest attempt and last pass per job, plus evidence used for issue

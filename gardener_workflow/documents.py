@@ -222,7 +222,7 @@ def run_agent_job(kind: str) -> int:
                           f"Primary automation evidence:\n{render_health()}\nAnchor findings:\n{drift}\n")
                 if kind != "docsmith":
                     prompt += "This is a private operational summary: return no file edits; explain the supplied primary evidence.\n"
-                model = os.environ.get("BRIEF_MODEL", "claude-fable-5") if kind == "weekly" else os.environ.get("DOCSMITH_MODEL" if kind == "docsmith" else "DAILY_MODEL", "claude-sonnet-5")
+                model = os.environ.get("BRIEF_MODEL", "opus") if kind == "weekly" else os.environ.get("DOCSMITH_MODEL" if kind == "docsmith" else "DAILY_MODEL", "claude-sonnet-5")
                 code, payload = model_result(worktree, prompt, model, EDIT_SCHEMA, log)
                 for source, old in snapshots.items():
                     if source_snapshot(Path(source), operational_refs=False) != old:
