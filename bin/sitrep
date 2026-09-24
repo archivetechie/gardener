@@ -1,80 +1,9 @@
 #!/usr/bin/env bash
-# gardener sitrep — cross-repo situation report: the shared context bus between
-# agent sessions (human shells, Claude cockpits, codex sessions).
-#
-# Any session runs this at start or after a gap to see what happened elsewhere —
-# commits made from OTHER sessions, open standing issues, pending prompts — so no
-# session ever has to "rediscover" work. Deterministic, no LLM, ~1s.
-#
-# Repos come from ~/.config/gardener/repos (one path per line, '#' comments).
-# The "hub" repo (holds STANDING.md, GAPBOARD.md, docs/INDEX.md, journal/) is the
-# first repo in that list, or HUB_REPO from ~/.config/gardener/config.
-#
-# Usage: sitrep [since]        e.g. sitrep "3 days ago"   (default: 24 hours ago)
-
-set -uo pipefail
-
+# Delegate to the shared evidence, isolation, and ownership implementation.
+set -euo pipefail
+export TZ=UTC
 CONFIG_DIR="${GARDENER_CONFIG_DIR:-$HOME/.config/gardener}"
-SINCE="${1:-24 hours ago}"
-
-[[ -f "$CONFIG_DIR/config" ]] && source "$CONFIG_DIR/config"
-
-mapfile -t REPOS < <(grep -vE '^\s*(#|$)' "$CONFIG_DIR/repos" 2>/dev/null | sed "s|^~|$HOME|")
-((${#REPOS[@]})) || { echo "no repos configured in $CONFIG_DIR/repos" >&2; exit 1; }
-HUB="${HUB_REPO:-${REPOS[0]}}"
-
-bold() { printf '\033[1m%s\033[0m\n' "$*"; }
-
-bold "── sitrep: commits since ${SINCE} ──"
-for repo in "${REPOS[@]}"; do
-    [[ -d "$repo/.git" ]] || continue
-    log=$(git -C "$repo" log --oneline --since="$SINCE" 2>/dev/null | head -12)
-    dirty=$(git -C "$repo" status --porcelain 2>/dev/null | wc -l)
-    if [[ -n "$log" || "$dirty" -gt 0 ]]; then
-        bold "$(basename "$repo")$( ((dirty>0)) && echo "  [${dirty} uncommitted]")"
-        [[ -n "$log" ]] && sed 's/^/  /' <<<"$log"
-    fi
-done
-
-if [[ -f "$HUB/STANDING.md" ]]; then
-    bold "── STANDING (open/fix-queued) ──"
-    grep -E '^\|' "$HUB/STANDING.md" \
-        | grep -viE 'fixed |accepted|^\| Issue|^\|---' \
-        | cut -c1-160 | sed 's/^/  /' || echo "  (none)"
-fi
-
-if [[ -f "$HUB/GAPBOARD.md" ]]; then
-    bold "── GAPBOARD headline + halts ──"
-    grep -m1 "^_Latest run" "$HUB/GAPBOARD.md" | cut -c1-160 | sed 's/^/  /'
-    grep -E "halted" "$HUB/GAPBOARD.md" | grep -vE "Recent halt|halt history" \
-        | head -5 | cut -c1-160 | sed 's/^/  /'
-fi
-
-if [[ -f "$HUB/docs/INDEX.md" ]]; then
-    bold "── pending prompts (INDEX) ──"
-    grep -iE "pending" "$HUB/docs/INDEX.md" \
-        | grep -oE '`[^`]*prompt[^`]*`' | sort -u | sed 's/^/  /' | head -12 || echo "  (none)"
-fi
-
-# Vendored contracts drift silently: a copy is only updated as a deliberate
-# tracking event, so nothing tells you how far behind it is until something
-# breaks. Report the distance rather than closing it — closing it is a decision.
-bold "── vendored contract drift ──"
-_drift_any=0
-while IFS='|' read -r src dst label; do
-    [[ -f "$src" && -f "$dst" ]] || continue
-    n=$(diff "$src" "$dst" 2>/dev/null | grep -c '^[<>]' || true)
-    if [[ "${n:-0}" -gt 0 ]]; then
-        echo "  $label: $n line(s) behind $(basename "$src")"
-        _drift_any=1
-    fi
-done <<'PAIRS'
-/home/swami/remanence/proto/layer5.proto|/home/swami/sutradhara/proto/layer5.proto|sutradhara vendored layer5.proto
-PAIRS
-[[ "$_drift_any" -eq 0 ]] && echo "  (all vendored copies current)"
-
-if [[ -d "$HUB/journal" ]]; then
-    bold "── journal today ──"
-    J="$HUB/journal/$(date +%F).md"
-    [[ -f "$J" ]] && grep -E '^##' "$J" | sed 's/^/  /' || echo "  (no entries yet)"
-fi
+set -a
+[[ ! -f "$CONFIG_DIR/config" ]] || source "$CONFIG_DIR/config"
+set +a
+exec "$(dirname "$(readlink -f "$0")")/workflow" sitrep "$@"
