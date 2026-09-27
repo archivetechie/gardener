@@ -11,7 +11,9 @@
 #      can hang until killed. Always </dev/null here.
 #
 # Usage:
-#   codex-exec <prompt-file> [--cd <dir>] [--write] [--timeout <secs>] [--model <id>]
+#   codex-exec <prompt-file> [--cd <dir>] [--write] [--timeout <secs>] [--model <id>] [--effort <level>]
+# --effort sets model_reasoning_effort for this run (low, medium, high, xhigh);
+# without it codex uses the config default.
 # The prompt comes from a FILE (keeps shell-quoting sane, transcript reviewable).
 
 set -uo pipefail
@@ -22,6 +24,7 @@ CD_DIR="$HOME"
 SANDBOX="read-only"
 TIMEOUT=86400
 MODEL=""
+EFFORT=""
 
 while (($#)); do
     case "$1" in
@@ -30,6 +33,7 @@ while (($#)); do
         --full)    SANDBOX="danger-full-access"; shift ;;  # network/system access; use for impl phases that need it
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --model)   MODEL="$2"; shift 2 ;;
+        --effort)  EFFORT="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -42,6 +46,11 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache-codex}"
 
 MODEL_ARGS=()
 [[ -n "$MODEL" ]] && MODEL_ARGS=(--model "$MODEL")
+case "$EFFORT" in
+    ""|low|medium|high|xhigh) ;;
+    *) echo "unknown effort: $EFFORT" >&2; exit 2 ;;
+esac
+[[ -n "$EFFORT" ]] && MODEL_ARGS+=(-c "model_reasoning_effort=\"$EFFORT\"")
 
 # --- Serialization lease -------------------------------------------------
 # One codex-exec at a time across the whole box: protects the shared
