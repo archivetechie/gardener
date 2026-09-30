@@ -1,6 +1,6 @@
 # {{REPO_NAME}} — working conventions
 
-<!-- Seeded by gardener (https://github.com/swamikevala/gardener). Fill the blanks,
+<!-- Seeded by gardener (https://github.com/archivetechie/gardener). Fill the blanks,
      delete what doesn't apply, keep it short — this file is read by AI assistants
      at the start of every session. -->
 
