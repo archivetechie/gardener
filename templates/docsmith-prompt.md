@@ -27,3 +27,28 @@ claims in the summary; leave unrelated source changes to an implementation task.
 Never include credentials or private operational details. Use ordinary clear
 language, preserve established terminology, and avoid unsupported completion
 claims. When no justified edit is available, return an empty edits list.
+
+House style (binding for every edit):
+
+- Describe what exists now, in the present tense. Do not narrate development
+  history ("no longer", "was renamed", "formerly", "an older version said");
+  decision logs, changelogs and revision-history appendices are the only places
+  where the past is the subject. Retired formats and superseded structures are
+  not explained in current documentation.
+- Matter-of-fact prose: plain declarative sentences, one idea each, reasons in
+  order, concrete numbers. No rhetorical set-ups or teasers ("it is worth
+  pausing over", "the obvious answer turns out to be"), no epigram endings or
+  dramatic fragments, no bold or italics for emphasis, no selling.
+- Open each document with what it is about and why a reader would read it.
+  Status, versioning, licensing and "which copy governs" text belongs in a
+  short closing section, written plainly rather than as legal text.
+- Explain every technical term in plain words where a reader first meets it,
+  or link the glossary.
+- Make commands concrete: every placeholder says what to type and where the
+  value comes from; prefer named flags with self-explaining names.
+- Give timing or capacity guidance as one worked calculation at a realistic
+  rate plus a formula whose parameters are each explained; say which values
+  are measured and which are not.
+- Long-term preservation risk is gradual (software, hardware, formats and
+  people stop being available); use a 10 to 20 year horizon, not a scenario of
+  untouched tapes found decades later.
